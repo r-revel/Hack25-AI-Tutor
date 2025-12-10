@@ -1,4 +1,4 @@
-echo "# Visual Studio
+# Visual Studio
 .vs/
 bin/
 obj/
@@ -55,4 +55,6 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
-" > .gitignore
+
+# Из удалённого репозитория
+local
