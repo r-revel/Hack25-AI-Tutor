@@ -111,3 +111,7 @@ if __name__ == "__main__":
             print(f"{i}. {source[:100]}...")
     else:
         print("Ошибка:", result["error"])
+
+
+# Установка зависимостей
+# pip install langchain langchain-community chromadb sentence-transformers ollama
