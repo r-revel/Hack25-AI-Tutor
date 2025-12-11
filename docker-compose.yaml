@@ -1,5 +1,3 @@
-version: '3.8'
-
 name: Hack25-AI-Tutor
 services:
     sqlpreview:
@@ -28,6 +26,22 @@ services:
         - ADMINER_DEFAULT_DB=master
       depends_on:
         - sqlpreview              
+    ollama:
+      volumes:
+          - ollama:/root/.ollama
+      ports:
+          - 11434:11434
+      container_name: ollama
+      image: ollama/ollama
+      deploy:
+        resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                count: all
+                capabilities: [gpu]
+
 
 volumes:
   db_data_mssql:
+  ollama:

@@ -58,3 +58,4 @@ yarn-error.log*
 
 # Из удалённого репозитория
 local
+chroma_db
