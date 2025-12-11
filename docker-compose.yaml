@@ -1,0 +1,33 @@
+version: '3.8'
+
+name: Hack25-AI-Tutor
+services:
+    sqlpreview:
+        environment:
+            - ACCEPT_EULA=Y
+            - MSSQL_SA_PASSWORD=Im@5ldnm!
+            - MSSQL_PID=Evaluation
+        ports:
+            - 1433:1433
+        container_name: sqlpreview
+        hostname: sqlpreview
+        image: mcr.microsoft.com/mssql/server:2025-latest
+        volumes:
+            - db_data_mssql:/var/opt/mssql
+        deploy:
+          resources:
+              limits:
+                  memory: 24g    
+    adminer:
+      image: adminer
+      container_name: mssql-adminer
+      ports:
+        - 8030:8080
+      environment:
+        - ADMINER_DEFAULT_SERVER=sqlpreview
+        - ADMINER_DEFAULT_DB=master
+      depends_on:
+        - sqlpreview              
+
+volumes:
+  db_data_mssql:
