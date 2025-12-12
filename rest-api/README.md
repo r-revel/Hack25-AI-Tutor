@@ -6,7 +6,7 @@ pip freeze > requirements.txt
 ```bash
 
 python3 -m venv ./venv
-source .venv/bin/activate
+source .venv/bin/activate #для винды .\.venv\Scripts\Activate.ps1
 # install
 pip install -r requirements.txt
 

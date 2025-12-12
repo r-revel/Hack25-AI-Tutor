@@ -9,10 +9,16 @@ using OllamaSharp;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
-IChatClient chatClient = new OllamaApiClient(new Uri("http://localhost:11434"),
-    "llama3.2");
-IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator = new OllamaApiClient(new Uri("http://localhost:11434"),
-    "all-minilm");
+var ollamaUri = new Uri(
+    builder.Environment.IsDevelopment()
+        ? "http://localhost:11434"   // если на хосте
+        : "http://ollama:11434"      // если в docker
+);
+
+IChatClient chatClient = new OllamaApiClient(ollamaUri, "qwen2.5:1.5b");
+IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator =
+    new OllamaApiClient(ollamaUri, "nomic-embed-text");
+
 
 var vectorStore = new JsonVectorStore(Path.Combine(AppContext.BaseDirectory, "vector-store"));
 
