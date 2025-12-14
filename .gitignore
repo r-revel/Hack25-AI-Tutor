@@ -39,6 +39,9 @@ artifacts/
 *.db
 *.db-shm
 *.db-wal
+*.sqlite3
+*.bin
+*.pickle
 
 # Local vector store
 vector-store/

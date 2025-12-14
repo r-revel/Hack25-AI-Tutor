@@ -9,7 +9,7 @@
 ## Установка
 1. Создать виртуальное окружение
 ```bash
-python -m venv .venv
+py -3.13 -m venv .venv # или python -m venv .venv
 source .venv/bin/activate # или .venv\Scripts\activate на Windows
 pip install -r requirements.txt
 ```
