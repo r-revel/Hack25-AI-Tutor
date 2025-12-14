@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+chromadb
+sentence-transformers
+langchain
+langchain-text-splitters
+gradio
+requests
+python-multipart
+pydantic
