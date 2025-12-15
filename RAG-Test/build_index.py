@@ -6,6 +6,7 @@ import chromadb
 from chromadb.config import Settings
 import os
 import uuid
+import torch
 
 
 
@@ -24,7 +25,8 @@ def clean_text(t: str) -> str:
 
 def build_index(input_path: str, persist_dir: str):
     print('Load model...')
-    emb_model = SentenceTransformer('intfloat/multilingual-e5-large')
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    emb_model = SentenceTransformer('intfloat/multilingual-e5-large', device=device)
 
     print('Init chroma...')
     client = chromadb.PersistentClient(path=persist_dir)
