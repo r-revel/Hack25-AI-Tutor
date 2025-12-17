@@ -98,6 +98,7 @@ class UserProgressResponse(UserProgressBase):
 class TestAnswerBase(BaseModel):
     question_id: int
     user_answer: str
+    is_correct: Optional[bool] = None
 
 
 class TestSessionCreate(BaseModel):
