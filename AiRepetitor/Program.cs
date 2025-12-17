@@ -5,36 +5,33 @@ using AiRepetitor.Components;
 using AiRepetitor.Services;
 using AiRepetitor.Services.Ingestion;
 using OllamaSharp;
+using DotNetEnv;
+using System.Diagnostics; // Р”РѕР±Р°РІСЊС‚Рµ СЌС‚Сѓ СЃС‚СЂРѕРєСѓ
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
-// 1) Если Blazor запускать на винде, а backend+ollama в Docker с проброшенными портами:
-var backendBaseUrl_Host = "http://localhost:8000";
-var ollamaBaseUrl_Host = "http://localhost:11434";
-
-// 2) Если Blazor запускать В DOCKER COMPOSE (как сервис), а backend и ollama тоже в compose:
-var backendBaseUrl_Docker = "http://backend:8000";
-var ollamaBaseUrl_Docker = "http://ollama:11434";
+// Р—Р°РіСЂСѓР·РёС‚Рµ РїРµСЂРµРјРµРЅРЅС‹Рµ РёР· .env С„Р°Р№Р»Р° (РґРѕР±Р°РІСЊС‚Рµ РІ СЃР°РјРѕРј РЅР°С‡Р°Р»Рµ)
+Env.Load(); // Р—Р°РіСЂСѓР¶Р°РµС‚ РёР· .env РІ РєРѕСЂРЅРµ РїСЂРѕРµРєС‚Р°
 
 
-// Выбор по окружению: Development => запуск на хосте, иначе => в docker
-// (если ты запускаешь Blazor в docker, выставляй ASPNETCORE_ENVIRONMENT=Production или Staging)
-var backendBaseUrl = builder.Environment.IsDevelopment()
-    ? backendBaseUrl_Host
-    : backendBaseUrl_Docker;
+var backendBaseUrl = Environment.GetEnvironmentVariable("BACKEND_URL");
+var ollamaBaseUrl = Environment.GetEnvironmentVariable("OLLAMA_URL");
 
-var ollamaBaseUrl = builder.Environment.IsDevelopment()
-    ? ollamaBaseUrl_Host
-    : ollamaBaseUrl_Docker;
-
+// Р›РѕРіРёСЂРѕРІР°РЅРёРµ РґР»СЏ РѕС‚Р»Р°РґРєРё (Р»СѓС‡С€Рµ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ ILogger)
+Console.WriteLine($"BACKEND_URL: {backendBaseUrl}");
+Console.WriteLine($"OLLAMA_URL: {ollamaBaseUrl}");
 
 var ollamaUri = new Uri(ollamaBaseUrl);
 
 
-IChatClient chatClient = new OllamaApiClient(ollamaUri, "qwen2.5:1.5b");
+IChatClient chatClient = new OllamaApiClient(ollamaUri, Environment.GetEnvironmentVariable("MODEL_OLLAMA_CHAT"));
 IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator =
-    new OllamaApiClient(ollamaUri, "nomic-embed-text");
+    new OllamaApiClient(ollamaUri, Environment.GetEnvironmentVariable("MODEL_OLLAMA_EMBEDDING"));
+
+// Р РµРіРёСЃС‚СЂРёСЂСѓРµРј РІ DI РєРѕРЅС‚РµР№РЅРµСЂРµ (Р”РћР‘РђР’Р¬РўР• Р­РўР РЎРўР РћРљР!)
+builder.Services.AddSingleton(chatClient);
+builder.Services.AddSingleton(embeddingGenerator);
 
 builder.Services.AddHttpClient("Backend", c =>
 {
@@ -48,8 +45,8 @@ builder.Services.AddScoped<DataIngestor>();
 builder.Services.AddScoped<BackendApi>();
 builder.Services.AddSingleton<SemanticSearch>();
 
-builder.Services.AddChatClient(chatClient).UseFunctionInvocation().UseLogging();
-builder.Services.AddEmbeddingGenerator(embeddingGenerator);
+// builder.Services.AddChatClient(chatClient).UseFunctionInvocation().UseLogging();
+// builder.Services.AddEmbeddingGenerator(embeddingGenerator);
 
 builder.Services.AddDbContext<IngestionCacheDbContext>(options =>
     options.UseSqlite("Data Source=ingestioncache.db"));
