@@ -16,7 +16,7 @@ from typing import Dict, Any, AsyncGenerator
 from pydantic import BaseModel
 import asyncio
 from datetime import datetime
-from lib.creater_question import generate_questions_from_book
+#from lib.creater_question import generate_questions_from_book
 
 
 # Create database tables
@@ -240,13 +240,19 @@ def get_generated_questions(
     topic = crud.get_topic(db, topic_id=topic_id)
     if topic is None:
         raise HTTPException(status_code=404, detail="Topic not found")
-    
-    # Генерируем вопросы
+
+    # Пытаемся импортировать генератор только когда реально нужен
+    try:
+        from lib.creater_question import generate_questions_from_book
+    except ImportError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Генерация вопросов сейчас недоступна: {e}"
+        )
+
     generated_data = generate_questions_from_book(4, json.loads(topic.json))
-    
-    # Создаем вопросы в базе данных
+
     for question_item in generated_data:
-        # Создаем объект QuestionCreate с topic_id
         question_create = schemas.QuestionCreate(
             question_text=question_item["question_text"],
             option_a=question_item["option_a"],
@@ -258,7 +264,8 @@ def get_generated_questions(
         )
         crud.create_question(db=db, question=question_create)
     
-    return 'success'
+    return "success"
+
 
 
 @app.post("/admin/topics", response_model=schemas.TopicResponse)

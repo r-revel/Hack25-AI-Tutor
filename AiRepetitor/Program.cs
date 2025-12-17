@@ -6,55 +6,85 @@ using AiRepetitor.Services;
 using AiRepetitor.Services.Ingestion;
 using OllamaSharp;
 using DotNetEnv;
-using System.Diagnostics; // Добавьте эту строку
+using System.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
-// Загрузите переменные из .env файла (добавьте в самом начале)
-Env.Load(); // Загружает из .env в корне проекта
+// Razor + interactive Blazor Server
+builder.Services.AddRazorComponents()
+                .AddInteractiveServerComponents();
+
+// Подхватываем .env если есть
+Env.Load();
 
 
+// ==== читаем конфиги из env ====
 var backendBaseUrl = Environment.GetEnvironmentVariable("BACKEND_URL");
-var ollamaBaseUrl = Environment.GetEnvironmentVariable("OLLAMA_URL");
+var ollamaBaseUrl  = Environment.GetEnvironmentVariable("OLLAMA_URL");
+var chatModel      = Environment.GetEnvironmentVariable("MODEL_OLLAMA_CHAT");
+var embedModel     = Environment.GetEnvironmentVariable("MODEL_OLLAMA_EMBEDDING");
 
-// Логирование для отладки (лучше использовать ILogger)
-Console.WriteLine($"BACKEND_URL: {backendBaseUrl}");
-Console.WriteLine($"OLLAMA_URL: {ollamaBaseUrl}");
+Console.WriteLine($"BACKEND_URL={backendBaseUrl}");
+Console.WriteLine($"OLLAMA_URL={ollamaBaseUrl}");
+Console.WriteLine($"CHAT_MODEL={chatModel}");
+Console.WriteLine($"EMBED_MODEL={embedModel}");
 
+
+// ==== проверяем обязательные переменные ====
+if (string.IsNullOrWhiteSpace(ollamaBaseUrl))
+    throw new InvalidOperationException("OLLAMA_URL is not set");
+
+if (string.IsNullOrWhiteSpace(chatModel))
+    throw new InvalidOperationException("MODEL_OLLAMA_CHAT is not set");
+
+if (string.IsNullOrWhiteSpace(embedModel))
+    throw new InvalidOperationException("MODEL_OLLAMA_EMBEDDING is not set");
+
+
+// ==== Ollama ====
 var ollamaUri = new Uri(ollamaBaseUrl);
 
-
-IChatClient chatClient = new OllamaApiClient(ollamaUri, Environment.GetEnvironmentVariable("MODEL_OLLAMA_CHAT"));
+IChatClient chatClient = new OllamaApiClient(ollamaUri, chatModel);
 IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator =
-    new OllamaApiClient(ollamaUri, Environment.GetEnvironmentVariable("MODEL_OLLAMA_EMBEDDING"));
+        new OllamaApiClient(ollamaUri, embedModel);
 
-// Регистрируем в DI контейнере (ДОБАВЬТЕ ЭТИ СТРОКИ!)
 builder.Services.AddSingleton(chatClient);
 builder.Services.AddSingleton(embeddingGenerator);
 
-builder.Services.AddHttpClient("Backend", c =>
+
+// ==== HTTP-клиенты ====
+builder.Services.AddHttpClient();           // фабрика всегда есть
+
+if (!string.IsNullOrWhiteSpace(backendBaseUrl))
 {
-    c.BaseAddress = new Uri(backendBaseUrl);
-});
+    builder.Services.AddHttpClient("Backend", client =>
+    {
+        client.BaseAddress = new Uri(backendBaseUrl);
+    });
 
+    builder.Services.AddScoped<BackendApi>();  // регистрируем API только если реально есть backend URL
+}
+
+
+// ==== Векторное хранилище ====
 var vectorStore = new JsonVectorStore(Path.Combine(AppContext.BaseDirectory, "vector-store"));
-
 builder.Services.AddSingleton<IVectorStore>(vectorStore);
+
 builder.Services.AddScoped<DataIngestor>();
-builder.Services.AddScoped<BackendApi>();
 builder.Services.AddSingleton<SemanticSearch>();
 
-// builder.Services.AddChatClient(chatClient).UseFunctionInvocation().UseLogging();
-// builder.Services.AddEmbeddingGenerator(embeddingGenerator);
 
+// ==== кеш загрузок ====
 builder.Services.AddDbContext<IngestionCacheDbContext>(options =>
     options.UseSqlite("Data Source=ingestioncache.db"));
 
+
+// ==== BUILD ====
 var app = builder.Build();
 IngestionCacheDbContext.Initialize(app.Services);
 
-// Configure the HTTP request pipeline.
+
+// ==== PIPELINE ====
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
@@ -63,25 +93,39 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseAntiforgery();
-
 app.UseStaticFiles();
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-// Ingest PDF from /wwwroot/Data
-await DataIngestor.IngestDataAsync(
-    app.Services,
-    new PDFDirectorySource(Path.Combine(builder.Environment.WebRootPath, "Data")));
 
-app.Logger.LogInformation("Backend API URL = {Url}", backendBaseUrl);
-app.Logger.LogInformation("Ollama URL = {Url}", ollamaBaseUrl);
+// ==== тихо загружаем PDF при старте ====
+try
+{
+    await DataIngestor.IngestDataAsync(
+        app.Services,
+        new PDFDirectorySource(Path.Combine(builder.Environment.WebRootPath, "Data"))
+    );
 
+    app.Logger.LogInformation("PDF ingestion completed");
+}
+catch (Exception ex)
+{
+    app.Logger.LogError(ex, "Failed to ingest PDF data at startup");
+}
+
+
+// ==== debug endpoint ====
 app.MapGet("/debug/where", () => new
 {
     env = app.Environment.EnvironmentName,
     backendBaseUrl,
-    ollamaBaseUrl
+    ollamaBaseUrl,
+    chatModel,
+    embedModel
 });
 
-app.Run();
+app.Logger.LogInformation("Backend API URL = {BackendURL}", backendBaseUrl);
+app.Logger.LogInformation("Ollama URL = {OllamaURL}", ollamaBaseUrl);
 
+app.Run();
