@@ -16,6 +16,7 @@ from typing import Dict, Any, AsyncGenerator
 from pydantic import BaseModel
 import asyncio
 from datetime import datetime
+from lib.creater_question import generate_questions_from_book
 
 
 # Create database tables
@@ -32,7 +33,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Authentication endpoints
 
 @app.post("/register", response_model=schemas.UserResponse)
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
@@ -61,8 +61,6 @@ def login(user_login: schemas.UserLogin, db: Session = Depends(get_db)):
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-# Topics endpoints
-
 
 @app.get("/topics", response_model=List[schemas.TopicResponse])
 def get_topics(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
@@ -76,8 +74,6 @@ def get_topic(topic_id: int, db: Session = Depends(get_db)):
     if topic is None:
         raise HTTPException(status_code=404, detail="Topic not found")
     return topic
-
-# Progress endpoints
 
 
 @app.get("/topics/{topic_id}/progress", response_model=List[schemas.UserProgressResponse])
@@ -108,8 +104,6 @@ def add_progress_message(
         progress=progress,
         user_id=current_user.id
     )
-
-# Test endpoints
 
 
 @app.post("/topics/{topic_id}/start-test", response_model=schemas.TestSessionResponse)
@@ -237,7 +231,34 @@ def get_test_history(
     ).order_by(models.TestSession.started_at.desc()).offset(skip).limit(limit).all()
     return tests
 
-# Admin endpoints (optional - for adding content)
+
+@app.get("/admin/generated/questions", response_model=str)
+def get_generated_questions(
+    topic_id: int,
+    db: Session = Depends(get_db)
+):
+    topic = crud.get_topic(db, topic_id=topic_id)
+    if topic is None:
+        raise HTTPException(status_code=404, detail="Topic not found")
+    
+    # Генерируем вопросы
+    generated_data = generate_questions_from_book(4, json.loads(topic.json))
+    
+    # Создаем вопросы в базе данных
+    for question_item in generated_data:
+        # Создаем объект QuestionCreate с topic_id
+        question_create = schemas.QuestionCreate(
+            question_text=question_item["question_text"],
+            option_a=question_item["option_a"],
+            option_b=question_item["option_b"],
+            option_c=question_item["option_c"],
+            option_d=question_item["option_d"],
+            correct_answer=question_item["correct_answer"],
+            topic_id=topic_id
+        )
+        crud.create_question(db=db, question=question_create)
+    
+    return 'success'
 
 
 @app.post("/admin/topics", response_model=schemas.TopicResponse)
