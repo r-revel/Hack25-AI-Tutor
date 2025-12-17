@@ -1,4 +1,4 @@
-fastapi==0.124.2
+fastapi==0.104.1
 uvicorn[standard]==0.24.0
 sqlalchemy==2.0.23
 alembic==1.12.1
@@ -9,3 +9,11 @@ python-dotenv==1.0.0
 python-jose[cryptography]==3.3.0
 python-multipart==0.0.6
 sse-starlette==2.3.6
+# Добавьте эти библиотеки:
+bcrypt==4.1.2  # Для хеширования паролей
+# Для работы с датами и JWT:
+pyjwt==2.8.0
+# Для проверки типов (опционально):
+typing-extensions==4.9.0
+# Для async/await:
+anyio==4.2.0
