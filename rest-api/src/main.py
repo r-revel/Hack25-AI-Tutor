@@ -34,7 +34,6 @@ app.add_middleware(
 
 # Authentication endpoints
 
-
 @app.post("/register", response_model=schemas.UserResponse)
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_username(db, username=user.username)
