@@ -2,7 +2,7 @@ import { useAuthStore } from '@/store'
 import axios from 'axios'
 
 const client = axios.create({
-  baseURL: 'http://localhost:8010', // Заменить на ваш API URL
+  baseURL: 'http://localhost:8000', // Заменить на ваш API URL
   headers: {
     'Content-Type': 'application/json'
   }

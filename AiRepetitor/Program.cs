@@ -1,3 +1,4 @@
+// Program.cs
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
@@ -6,7 +7,11 @@ using AiRepetitor.Services;
 using AiRepetitor.Services.Ingestion;
 using OllamaSharp;
 using DotNetEnv;
-using System.Diagnostics;
+
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Components.Authorization;
+using AiRepetitor.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -79,6 +84,39 @@ builder.Services.AddDbContext<IngestionCacheDbContext>(options =>
     options.UseSqlite("Data Source=ingestioncache.db"));
 
 
+// ==== Auth (Identity) ====
+builder.Services.AddDbContext<AuthDbContext>(options =>
+    options.UseSqlite("Data Source=auth.db"));
+
+builder.Services
+    .AddIdentityCore<IdentityUser>(options =>
+    {
+        // Упростим пароль для теста
+        options.Password.RequireDigit = false;
+        options.Password.RequireLowercase = false;
+        options.Password.RequireNonAlphanumeric = false;
+        options.Password.RequireUppercase = false;
+        options.Password.RequiredLength = 6;
+
+        // То, что тебе нужно сейчас:
+        options.SignIn.RequireConfirmedAccount = false;
+    })
+    .AddEntityFrameworkStores<AuthDbContext>()
+    .AddSignInManager();
+
+// Cookie-аутентификация для Blazor Server
+builder.Services
+    .AddAuthentication(options =>
+    {
+        options.DefaultScheme = IdentityConstants.ApplicationScheme;
+        options.DefaultSignInScheme = IdentityConstants.ApplicationScheme;
+    })
+    .AddIdentityCookies();
+
+// Авторизация + проброс AuthenticationState в компоненты
+builder.Services.AddAuthorization();
+builder.Services.AddCascadingAuthenticationState();
+
 // ==== BUILD ====
 var app = builder.Build();
 IngestionCacheDbContext.Initialize(app.Services);
@@ -94,6 +132,9 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseAntiforgery();
 app.UseStaticFiles();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
