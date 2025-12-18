@@ -1,39 +1,55 @@
 @page "/login"
 @using Microsoft.AspNetCore.Identity
 @using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
 @inject SignInManager<IdentityUser> SignInManager
 @inject NavigationManager Nav
 
-<h3>Вход</h3>
+<PageTitle>Вход</PageTitle>
 
-@if (!string.IsNullOrEmpty(errorMessage))
-{
-    <div class="text-danger">@errorMessage</div>
-}
+<div class="d-flex justify-content-center align-items-center min-vh-100">
+    <div class="card shadow-sm" style="min-width: 380px; max-width: 420px;">
+        <div class="card-body">
+            <h3 class="card-title mb-4 text-center">Вход</h3>
 
-<EditForm Model="@model" OnValidSubmit="HandleLogin">
-    <DataAnnotationsValidator />
-    <ValidationSummary />
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger" role="alert">
+                    @errorMessage
+                </div>
+            }
 
-    <div class="mb-3">
-        <label class="form-label">E-mail</label>
-        <InputText class="form-control" @bind-Value="model.Email" />
-        <ValidationMessage For="@(() => model.Email)" />
+            <EditForm Model="@model" OnValidSubmit="HandleLogin">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger" />
+
+                <div class="mb-3">
+                    <label class="form-label">E-mail</label>
+                    <InputText class="form-control" @bind-Value="model.Email" />
+                    <ValidationMessage For="@(() => model.Email)" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Пароль</label>
+                    <InputText class="form-control" @bind-Value="model.Password" type="password" />
+                    <ValidationMessage For="@(() => model.Password)" />
+                </div>
+
+                <div class="form-check mb-3">
+                    <InputCheckbox class="form-check-input" @bind-Value="model.RememberMe" />
+                    <label class="form-check-label">Запомнить меня</label>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 mb-2">Войти</button>
+
+                <div class="text-center">
+                    <small>Нет аккаунта? <a href="/register">Зарегистрироваться</a></small>
+                </div>
+            </EditForm>
+        </div>
     </div>
-
-    <div class="mb-3">
-        <label class="form-label">Пароль</label>
-        <InputText class="form-control" @bind-Value="model.Password" type="password" />
-        <ValidationMessage For="@(() => model.Password)" />
-    </div>
-
-    <div class="form-check mb-3">
-        <InputCheckbox class="form-check-input" @bind-Value="model.RememberMe" />
-        <label class="form-check-label">Запомнить меня</label>
-    </div>
-
-    <button type="submit" class="btn btn-primary">Войти</button>
-</EditForm>
+</div>
 
 @code {
     private LoginModel model = new();
@@ -51,7 +67,7 @@
 
         if (result.Succeeded)
         {
-            Nav.NavigateTo("/");
+            Nav.NavigateTo("/", forceLoad: true);
         }
         else
         {

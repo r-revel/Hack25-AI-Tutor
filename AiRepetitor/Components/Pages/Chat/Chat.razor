@@ -1,10 +1,13 @@
-﻿//Components/Pages/Chat/Chat.razor
+﻿<!--Components/Pages/Chat/Chat.razor!-->
 @page "/"
 @using System.ComponentModel
 @inject BackendApi BackendApi
 @inject NavigationManager Nav
 @inject SemanticSearch Search
 @implements IDisposable
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
 
 <PageTitle>Chat</PageTitle>
 

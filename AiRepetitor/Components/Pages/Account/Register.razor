@@ -1,41 +1,59 @@
 @page "/register"
 @using Microsoft.AspNetCore.Identity
 @using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
 @inject UserManager<IdentityUser> UserManager
 @inject SignInManager<IdentityUser> SignInManager
 @inject NavigationManager Nav
 
-<h3>Регистрация</h3>
+<PageTitle>Регистрация</PageTitle>
 
-@if (!string.IsNullOrEmpty(errorMessage))
-{
-    <div class="text-danger">@errorMessage</div>
-}
+<div class="d-flex justify-content-center align-items-center min-vh-100">
+    <div class="card shadow-sm" style="min-width: 380px; max-width: 420px;">
+        <div class="card-body">
+            <h3 class="card-title mb-4 text-center">Регистрация</h3>
 
-<EditForm Model="@model" OnValidSubmit="HandleRegister">
-    <DataAnnotationsValidator />
-    <ValidationSummary />
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger" role="alert">
+                    @errorMessage
+                </div>
+            }
 
-    <div class="mb-3">
-        <label class="form-label">E-mail</label>
-        <InputText class="form-control" @bind-Value="model.Email" />
-        <ValidationMessage For="@(() => model.Email)" />
+            <EditForm Model="@model" OnValidSubmit="HandleRegister">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger" />
+
+                <div class="mb-3">
+                    <label class="form-label">E-mail</label>
+                    <InputText class="form-control" @bind-Value="model.Email" />
+                    <ValidationMessage For="@(() => model.Email)" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Пароль</label>
+                    <InputText class="form-control" @bind-Value="model.Password" type="password" />
+                    <ValidationMessage For="@(() => model.Password)" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Повтор пароля</label>
+                    <InputText class="form-control" @bind-Value="model.ConfirmPassword" type="password" />
+                    <ValidationMessage For="@(() => model.ConfirmPassword)" />
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 mb-2">
+                    Зарегистрироваться
+                </button>
+
+                <div class="text-center">
+                    <small>Уже есть аккаунт? <a href="/login">Войти</a></small>
+                </div>
+            </EditForm>
+        </div>
     </div>
-
-    <div class="mb-3">
-        <label class="form-label">Пароль</label>
-        <InputText class="form-control" @bind-Value="model.Password" type="password" />
-        <ValidationMessage For="@(() => model.Password)" />
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Повтор пароля</label>
-        <InputText class="form-control" @bind-Value="model.ConfirmPassword" type="password" />
-        <ValidationMessage For="@(() => model.ConfirmPassword)" />
-    </div>
-
-    <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
-</EditForm>
+</div>
 
 @code {
     private RegisterModel model = new();
@@ -55,9 +73,8 @@
 
         if (result.Succeeded)
         {
-            // Автоматический вход после регистрации
             await SignInManager.SignInAsync(user, isPersistent: false);
-            Nav.NavigateTo("/");
+            Nav.NavigateTo("/", forceLoad: true);
         }
         else
         {

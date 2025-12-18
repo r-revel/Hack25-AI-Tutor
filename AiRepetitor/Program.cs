@@ -113,6 +113,13 @@ builder.Services
     })
     .AddIdentityCookies();
 
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/login";
+    options.AccessDeniedPath = "/login";
+});
+
+
 // Авторизация + проброс AuthenticationState в компоненты
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
@@ -120,6 +127,13 @@ builder.Services.AddCascadingAuthenticationState();
 // ==== BUILD ====
 var app = builder.Build();
 IngestionCacheDbContext.Initialize(app.Services);
+
+using (var scope = app.Services.CreateScope())
+{
+    var authDb = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+    authDb.Database.EnsureCreated();
+}
+
 
 
 // ==== PIPELINE ====
@@ -165,6 +179,14 @@ app.MapGet("/debug/where", () => new
     chatModel,
     embedModel
 });
+
+app.MapPost("/logout", async (
+    SignInManager<IdentityUser> signInManager,
+    HttpContext httpContext) =>
+{
+    await signInManager.SignOutAsync();
+    return Results.Redirect("/login");
+}).RequireAuthorization();
 
 app.Logger.LogInformation("Backend API URL = {BackendURL}", backendBaseUrl);
 app.Logger.LogInformation("Ollama URL = {OllamaURL}", ollamaBaseUrl);
