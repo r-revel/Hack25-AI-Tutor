@@ -1,0 +1,13 @@
+{
+  "title": "Развертывание K3s на сервере Bare Metal",
+  "chapters": [
+    {
+      "name": "Развертывание K3s на сервере Bare Metal",
+      "content": "Практические руководства Evolution    \n\n # Развертывание K3s на сервере Bare Metal   Эта статья полезна?          \nС помощью этого руководства вы развернете сервер Bare Metal с K3s — упрощенной версией Kubernetes для сред с ограниченными ресурсами.\nРешение сохраняет все возможности Kubernetes и подходит для тестирования и разработки небольших приложений.\nШаги:\n1. Разверните инфраструктуру.\n2. Установите K3s.\n3. Настройте удаленный доступ.\n4. Добавьте дополнительные узлы.\n\n## 1. Разверните инфраструктуру\n1. Арендуйте сервер Bare Metal с публичным IP-адресом.\n2. Подключитесь к серверу по SSH или через виртуальную консоль.\n3. Обновите систему и установите утилиту Curl:\n```\nsudo apt update && sudo apt upgrade -ysudo apt install -y curl\n```\n4. Откройте порт 6443:\n```\nsudo ufw allow 6443\n```\n\n## 2. Установите K3s\n1. Выполните команду:\n```\ncurl -sfL https://get.k3s.io | sh -\n```\n2. Проверьте установку:\n```\nsystemctl status k3s\n```\n\nРезультат:\n```\n● k3s.service - Lightweight Kubernetes   Loaded: loaded (/etc/systemd/system/k3s.service; enabled; preset: enabled)   Active: active (running) since Thu 2025-07-17 13:26:31 MSK; 1s ago   ...\n```\n\n## 3. Настройте удаленный доступ\n1. Получите содержимое конфигурационного файла:\n```\ncat /etc/rancher/k3s/config.yaml\n```\n\nСкопируйте содержимое.\n2. Вставьте содержимое в файл /.kube/config на вашем устройстве.\nЗамените IP-адрес 127.0.0.1 на IP-адрес сервера или DNS-имя вашего хоста.\n\n## 4. Добавьте дополнительные узлы\nДополнительным узлом может стать виртуальная машина, другой сервер или пользовательское устройство.\n1. Сгенерируйте токен на сервере:\n```\nsudo k3s token create --ttl 1h\n```\n2. Установите K3s на новый узел:\n```\ncurl -sfL https://get.k3s.io | K3S_URL=https://<server_ip>:6443 K3S_TOKEN=<token> sh -\n```\n\nГде:\n- <server_ip> — IP-адрес сервера.\n- <token> — токен, полученный на предыдущем шаге.\n3. Проверьте подключение узла:\n```\nk3s kubectl get nodes\n```\n\nРезультат:\n```\nk3s kubectl get nodesNAME          STATUS   ROLES                  AGE     VERSIONserver.local  Ready    control-plane,master   3d      v1.31.5+k3s1\n```\nВы установили K3s, настроили к нему удаленный доступ и добавили дополнительные узлы для\nрасширения кластера.\nТакую конфигурацию можно использовать как среду для небольших приложений.\n\n  [© 2025 Cloud.ru](https://cloud.ru)",
+      "debug": {
+        "start_page": 1,
+        "end_page": 1
+      }
+    }
+  ]
+}

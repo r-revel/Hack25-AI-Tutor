@@ -1,0 +1,13 @@
+{
+  "title": "Контейнеры",
+  "chapters": [
+    {
+      "name": "Контейнеры",
+      "content": "Практические руководства Evolution    \n\n # Контейнеры   Эта статья полезна?          \n\n## Managed Kubernetes\nManaged Kubernetes — сервис управления кластерами Kubernetes на вычислительных ресурсах облачной архитектуры Cloud.ru Evolution.\nСоздавайте кластеры Managed Kubernetes, разворачивайте рабочие нагрузки и получайте навыки работы с Kubernetes в облаке.\n- Запуск контейнерного приложения в кластере Managed Kubernetes\n- Настройка автомасштабирования группы узлов\n- Развертывание Deployment с горизонтальным масштабированием подов\n- Настройка Time-Slicing GPU\n- Развертывание Deployment с вертикальным масштабированием подов\n- Пример развертывания сайта\n- Развертывание мультикластера Managed Kubernetes с помощью Karmada\n- Развертывание nginx в кластерах-участниках Karmada\n- Автоматическое масштабирование nginx с FederatedHPA и нагрузочное тестирование с k6\n- Работа с секретами при публикации приложений в Managed Kubernetes\n- Подключение Managed Redis® к сервисам в кластере Managed Kubernetes\n- Event-driven масштабирование в Managed Kubernetes с помощью KEDA\n- Развертывание кластера Managed Kubernetes с помощью Terraform\n- Продвинутые методики развертывания приложений Blue-Green и Canary в управляемом кластере Managed Kubernetes\n\n## Container Apps и Artifact Registry\nContainer Apps — это облачный сервиc платформы Cloud.ru Evolution для создания и запуска контейнерных приложений без знаний Kubernetes и настройки виртуальных машин.\nКонтейнеры запускаются из Docker-образов, которые хранятся в репозитории Artifact Registry.\nВ руководствах для развертывания контейнеров используются готовые демонстрационные образы.\nВы можете использовать их или образы своих приложений.\nПеред тем как приступить к руководствам, подготовьте среду.\n- Подготовка среды для Artifact Registry и Container Apps\n- Развертывание frontend-приложения в контейнере\n- Развертывание backend-приложения в контейнере\n- Развертывание Jupyter Server в контейнере\n- Настройка пайплайна CI/CD в GitHub, GitLab и GitVerse с использованием Artifact Registry\n- Запуск Telegram-бота на Python в контейнере\n- Создание Telegram-бота без написания кода с помощью n8n на основе Container Apps или Notebooks\n- Подключение ИИ из Foundation Models к nocode Telegram-боту на основе Container Apps или Notebooks\n- Создание django-приложения для раздачи фотографий\n- Вайб-кодинг с помощью Foundation Models и подключение MCP-сервера для деплоя приложения в Container Apps\n\n  [© 2025 Cloud.ru](https://cloud.ru)",
+      "debug": {
+        "start_page": 1,
+        "end_page": 1
+      }
+    }
+  ]
+}

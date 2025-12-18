@@ -1,0 +1,13 @@
+{
+  "title": "Брокеры сообщений",
+  "chapters": [
+    {
+      "name": "Брокеры сообщений",
+      "content": "Практические руководства Evolution    \n\n # Брокеры сообщений   Эта статья полезна?          \n\n## Managed Kafka®\nManaged Kafka® — это сервис для развертывания и управления кластерами Kafka® в инфраструктуре платформы Evolution.\n- Использование Managed Kafka® для фоновой обработки задач\n- Kafbat UI для менеджмента и мониторинга кластера Managed Kafka®\n- Чтение сообщений из топиков Managed Kafka®\n\n  [© 2025 Cloud.ru](https://cloud.ru)",
+      "debug": {
+        "start_page": 1,
+        "end_page": 1
+      }
+    }
+  ]
+}
