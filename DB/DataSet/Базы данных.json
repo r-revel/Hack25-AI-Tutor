@@ -1,0 +1,13 @@
+{
+  "title": "Базы данных",
+  "chapters": [
+    {
+      "name": "Базы данных",
+      "content": "Практические руководства Evolution    \n\n # Базы данных   Эта статья полезна?          \n\n## Managed PostgreSQL®\nManaged PostgreSQL® — это сервис для развертывания и управления кластерами Managed PostgreSQL® в инфраструктуре платформы Evolution.\n- Настройка взаимодействия приложения на виртуальных машинах с сервисом Managed PostgreSQL®\n- Развертывание Identity Provider Keycloak на виртуальной машине и Managed PostgreSQL®\n- Резервное копирование и восстановление базы данных\n- Развертывание сервиса статического мониторинга кода и безопасности SonarQube\n\n## Managed Redis®\nManaged Redis® — полностью управляемая in-memory база данных для высокопроизводительного кеширования данных, управления очередями и работы с данными в реальном времени.\n- Оптимизация производительности Web-приложения с Managed Redis®\n- Использование Managed Redis® как брокера сообщений\n- Подключение Managed Redis® к сервисам в кластере Managed Kubernetes\n\n  [© 2025 Cloud.ru](https://cloud.ru)",
+      "debug": {
+        "start_page": 1,
+        "end_page": 1
+      }
+    }
+  ]
+}
