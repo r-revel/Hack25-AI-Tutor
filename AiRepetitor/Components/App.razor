@@ -1,4 +1,4 @@
-﻿<!--App.razor!-->
+﻿<!-- AiRepetitor/Components/App.razor -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -6,26 +6,25 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    <link rel="stylesheet" href="@Assets["app.css"]" />
-    <link rel="stylesheet" href="@Assets["AiRepetitor.styles.css"]" />
-    <link rel="stylesheet"
+    <link rel="stylesheet" href="@(Assets["app.css"])" />
+    <link rel="stylesheet" href="@(Assets["AiRepetitor.styles.css"])" />
+    <link rel="stylesheet" href="css/auth.css" />
     <ImportMap />
     <HeadOutlet @rendermode="@renderMode" />
 </head>
 
-@using Microsoft.AspNetCore.Components.Authorization
-
 <body>
-    <CascadingAuthenticationState>
-        <Routes @rendermode="@renderMode" />
-    </CascadingAuthenticationState>
+    <!-- Identity уже даёт CascadingAuthenticationState, так что тут он не обязателен.
+         Но если хочешь – можно обернуть Routes ещё и сюда. -->
+    <Routes @rendermode="@renderMode" />
 
-    <script src="@Assets["app.js"]" type="module"></script>
-    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script src="@(Assets["app.js"])" type="module"></script>
+    <script src="@(Assets["_framework/blazor.web.js"])" ></script>
 </body>
 
 </html>
 
 @code {
-    private readonly IComponentRenderMode renderMode = new InteractiveServerRenderMode(prerender: false);
+    private readonly IComponentRenderMode renderMode =
+        new InteractiveServerRenderMode(prerender: false);
 }

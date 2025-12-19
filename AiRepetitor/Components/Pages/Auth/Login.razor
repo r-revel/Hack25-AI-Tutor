@@ -1,0 +1,102 @@
+<!-- AiRepetitor/Components/Pages/Auth/Login.razor -->
+@page "/login"
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.WebUtilities
+@inject NavigationManager Nav
+
+<PageTitle>Вход</PageTitle>
+
+<div class="auth-page-root">
+    <div class="auth-card">
+        <div class="auth-tabs">
+            <button type="button"
+                    class="auth-tab auth-tab--active">
+                Вход
+            </button>
+            <a href="/register"
+               class="auth-tab auth-tab--link">
+                Регистрация
+            </a>
+        </div>
+
+        <h2 class="auth-title">Вход</h2>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="auth-alert">@errorMessage</div>
+        }
+
+                <form method="post" action="/auth/login">
+            <input type="hidden" name="ReturnUrl" value="@returnUrl" />
+
+            <div class="auth-field">
+                <label class="auth-label" for="email">E-mail</label>
+                <input id="email"
+                    name="Email"
+                    type="email"
+                    class="auth-input"
+                    required />
+            </div>
+
+            <div class="auth-field">
+                <label class="auth-label" for="password">Пароль</label>
+                <input id="password"
+                    name="Password"
+                    type="password"
+                    class="auth-input"
+                    required />
+            </div>
+
+            <div class="auth-field auth-field--horizontal">
+                <input id="remember"
+                    name="RememberMe"
+                    type="checkbox"
+                    class="auth-checkbox" />
+                <label class="auth-label-inline" for="remember">
+                    Запомнить меня
+                </label>
+            </div>
+
+            <button type="submit" class="auth-button-primary">
+                Войти
+            </button>
+        </form>
+
+
+        <p class="auth-footer-text">
+            Нет аккаунта?
+            <a href="/register">Зарегистрироваться</a>
+        </p>
+    </div>
+</div>
+
+@code {
+    private string? errorMessage;
+    private string returnUrl = "/";
+
+    protected override void OnInitialized()
+    {
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("ReturnUrl", out var r))
+        {
+            // минимальная защита от open redirect
+            var raw = r.ToString();
+            if (!string.IsNullOrWhiteSpace(raw) && raw.StartsWith("/"))
+                returnUrl = raw;
+        }
+
+        if (query.TryGetValue("error", out var values))
+        {
+            var code = values.ToString();
+            errorMessage = code switch
+            {
+                "empty"   => "Заполните все поля.",
+                "invalid" => "Неверный логин или пароль.",
+                _         => "Не удалось войти. Попробуйте ещё раз."
+            };
+        }
+    }
+}

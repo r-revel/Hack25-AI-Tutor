@@ -1,3 +1,4 @@
+/*Chat.razor.css*/
 .chat-container {
     position: sticky; 
     bottom: 0; 
@@ -9,3 +10,12 @@
     background-color: #F3F4F6; 
     border-color: #E5E7EB;
 }
+
+
+/* Корневой контейнер чата (чтобы фон был под модальным окном) */
+.chat-root {
+    position: relative;
+    min-height: 100vh;
+    background-color: #F3F4F6;
+}
+

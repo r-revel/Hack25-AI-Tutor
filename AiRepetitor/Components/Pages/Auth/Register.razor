@@ -1,0 +1,82 @@
+@page "/register"
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.WebUtilities
+@inject NavigationManager Nav
+
+<PageTitle>Регистрация</PageTitle>
+
+<div class="auth-page-root">
+    <div class="auth-card">
+        <div class="auth-tabs">
+            <a class="auth-tab" href="/login">Вход</a>
+            <a class="auth-tab auth-tab--active" href="/register">Регистрация</a>
+        </div>
+
+        <h2 class="auth-title">Регистрация</h2>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="auth-alert">
+                @errorMessage
+            </div>
+        }
+
+        <form method="post" action="/auth/register">
+            <div class="auth-field">
+                <label class="auth-label" for="email">E-mail</label>
+                <input id="email"
+                       name="Email"
+                       type="email"
+                       class="auth-input"
+                       required />
+            </div>
+
+            <div class="auth-field">
+                <label class="auth-label" for="password">Пароль</label>
+                <input id="password"
+                       name="Password"
+                       type="password"
+                       class="auth-input"
+                       required
+                       minlength="6" />
+            </div>
+
+            <div class="auth-field">
+                <label class="auth-label" for="confirmPassword">Повтор пароля</label>
+                <input id="confirmPassword"
+                       name="ConfirmPassword"
+                       type="password"
+                       class="auth-input"
+                       required
+                       minlength="6" />
+            </div>
+
+            <button type="submit" class="auth-button-primary">
+                Зарегистрироваться
+            </button>
+        </form>
+    </div>
+</div>
+
+@code {
+    private string? errorMessage;
+
+    protected override void OnInitialized()
+    {
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("error", out var values))
+        {
+            var code = values.ToString();
+            errorMessage = code switch
+            {
+                "empty"    => "Заполните все поля.",
+                "nomatch"  => "Пароли не совпадают.",
+                "identity" => "Не удалось создать пользователя. Попробуйте ещё раз.",
+                _          => "Не удалось зарегистрироваться. Попробуйте ещё раз."
+            };
+        }
+    }
+}

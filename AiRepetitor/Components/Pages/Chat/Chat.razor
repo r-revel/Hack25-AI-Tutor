@@ -1,13 +1,12 @@
-﻿<!--Components/Pages/Chat/Chat.razor!-->
+﻿<!-- AiRepetitor/Components/Pages/Chat/Chat.razor -->
 @page "/"
 @using System.ComponentModel
-@inject BackendApi BackendApi
-@inject NavigationManager Nav
-@inject SemanticSearch Search
-@implements IDisposable
-@attribute [Authorize]
 @using Microsoft.AspNetCore.Authorization
-@attribute [AllowAnonymous]
+@inject BackendApi BackendApi
+@inject SemanticSearch Search
+
+@attribute [Authorize]
+@implements IDisposable
 
 <PageTitle>Chat</PageTitle>
 
@@ -15,16 +14,19 @@
 
 <ChatMessageList Messages="@messages" InProgressMessage="@currentResponseMessage">
     <NoMessagesContent>
-        <div>To get started, try asking about these example documents. You can replace these with your own data and replace this message.</div>
-        <ChatCitation File="Example_Emergency_Survival_Kit.pdf"/>
-        <ChatCitation File="Example_GPS_Watch.pdf"/>
+        <div>
+            To get started, try asking about these example documents.
+            You can replace these with your own data and replace this message.
+        </div>
+        <ChatCitation File="Example_Emergency_Survival_Kit.pdf" />
+        <ChatCitation File="Example_GPS_Watch.pdf" />
     </NoMessagesContent>
 </ChatMessageList>
 
 <div class="chat-container">
     <ChatSuggestions OnSelected="@AddUserMessageAsync" @ref="@chatSuggestions" />
     <ChatInput OnSend="@AddUserMessageAsync" @ref="@chatInput" />
-    <SurveyPrompt /> @* Remove this line to eliminate the template survey message *@
+    <SurveyPrompt />
 </div>
 
 @code {
@@ -42,7 +44,7 @@
 
         The quote must be max 5 words, taken word-for-word from the search result, and is the basis for why the citation is relevant.
         Don't refer to the presence of citations; just emit these tags right at the end, with no surrounding text.
-        ";
+    ";
 
     private readonly ChatOptions chatOptions = new();
     private readonly List<ChatMessage> messages = new();
@@ -78,7 +80,6 @@
 
     private void CancelAnyCurrentResponse()
     {
-        // If a response was cancelled while streaming, include it in the conversation so it's not lost
         if (currentResponseMessage is not null)
         {
             messages.Add(currentResponseMessage);
@@ -100,7 +101,8 @@
     [Description("Searches for information using a phrase or keyword")]
     private async Task<IEnumerable<string>> SearchAsync(
         [Description("The phrase to search for.")] string searchPhrase,
-        [Description("If possible, specify the filename to search that file only. If not provided or empty, the search includes all files.")] string? filenameFilter = null)
+        [Description("If possible, specify the filename to search that file only. If not provided or empty, the search includes all files.")]
+        string? filenameFilter = null)
     {
         await InvokeAsync(StateHasChanged);
         var results = await Search.SearchAsync(searchPhrase, filenameFilter, maxResults: 5);

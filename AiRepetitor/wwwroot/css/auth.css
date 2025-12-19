@@ -1,0 +1,157 @@
+/* AiRepetitor/wwwroot/css/auth.css */
+/* ========== AUTH SHARED CSS (логин + регистрация) ========== */
+
+.auth-page-root {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #F3F4F6;
+}
+
+/* card/modal */
+.auth-card,
+.auth-modal {
+    background: #ffffff;
+    border-radius: 0.75rem;
+    padding: 1.75rem 2rem;
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.25);
+    width: 100%;
+    max-width: 420px;
+}
+
+/* tabs */
+.auth-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.auth-tab {
+    flex: 1;
+    border: none;
+    background: #E5E7EB;
+    border-radius: 9999px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    color: #4B5563;
+    text-align: center;
+    text-decoration: none;
+}
+
+.auth-tab--active {
+    background: #4152d5;
+    color: #ffffff;
+}
+
+/* title */
+.auth-title {
+    font-size: 1.35rem;
+    font-weight: 600;
+    margin: 0 0 0.75rem 0;
+    color: #111827;
+}
+
+/* alerts/messages */
+.auth-alert {
+    font-size: 0.9rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    background: #FEE2E2;
+    color: #991B1B;
+    margin-bottom: 0.5rem;
+}
+
+/* form fields */
+.auth-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+}
+
+.auth-field--horizontal {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.35rem;
+}
+
+.auth-label {
+    font-size: 0.85rem;
+    color: #4B5563;
+}
+
+.auth-label-inline {
+    font-size: 0.9rem;
+    color: #374151;
+}
+
+/* inputs */
+.auth-input {
+    border-radius: 0.5rem;
+    border: 1px solid #E5E7EB;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.95rem;
+    outline: none;
+    background: #F9FAFB;
+}
+
+.auth-input:focus {
+    border-color: #4152d5;
+    box-shadow: 0 0 0 1px rgba(65, 82, 213, 0.4);
+    background: #ffffff;
+}
+
+/* checkbox */
+.auth-checkbox {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 0.25rem;
+    border: 1px solid #9CA3AF;
+}
+
+/* button */
+.auth-button-primary {
+    margin-top: 0.75rem;
+    width: 100%;
+    border: none;
+    border-radius: 9999px;
+    padding: 0.6rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    background: #4152d5;
+    color: #ffffff;
+    transition: background 0.15s ease;
+}
+
+.auth-button-primary:hover {
+    background: #3744b6;
+}
+
+/* footer link under login register */
+.auth-footer-text {
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    color: #6B7280;
+    text-align: center;
+}
+
+.auth-footer-text a {
+    color: #4152d5;
+    text-decoration: none;
+}
+
+.auth-footer-text a:hover {
+    text-decoration: underline;
+}
+
+/* validation */
+.auth-validation-summary,
+.auth-validation {
+    font-size: 0.8rem;
+    color: #B91C1C;
+}
