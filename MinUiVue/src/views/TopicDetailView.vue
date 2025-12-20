@@ -57,7 +57,7 @@ const sendMessage = async (message) => {
       is_user: true,
       topic_id: topicId.value
     })
-    topicsStore.progress.push(response.data)
+    topicsStore.progress = response.data;
   } catch (error) {
     console.error('Failed to send message:', error)
   }
