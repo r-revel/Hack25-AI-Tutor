@@ -1,0 +1,137 @@
+@page "/test/{SessionId:int}"
+@attribute [Authorize]
+@using AiRepetitor.Services
+@using Microsoft.AspNetCore.Authorization
+@inject BackendApi Backend
+@inject NavigationManager Nav
+
+<h3>Тест</h3>
+
+@if (isLoading)
+{
+    <p>Загрузка вопросов...</p>
+}
+else if (errorMessage is not null)
+{
+    <p style="color:red">@errorMessage</p>
+}
+else if (isSubmitted && result is not null)
+{
+    <h4>Результат</h4>
+    <p>@result.correct_answers из @result.total_questions (@result.percentage.ToString("F0")%)</p>
+
+    <button @onclick="@GoToTopics">К темам</button>
+    <button @onclick="@GoToHistory">К истории тестов</button>
+}
+else if (questions is null || !questions.Any())
+{
+    <p>Для этой темы пока нет вопросов.</p>
+}
+else
+{
+    <EditForm OnValidSubmit="@SubmitTest">
+        @foreach (var q in questions)
+        {
+            <div class="test-question">
+                <p><b>@q.question_text</b></p>
+
+                @foreach (var option in GetOptions(q))
+                {
+                    <label class="test-option">
+                        <input type="radio"
+                               name="@($"q_{q.id}")"
+                               value="@option.Key"
+                               checked="@IsSelected(q.id, option.Key)"
+                               @onchange="@(() => SelectAnswer(q.id, option.Key))" />
+                        <span>@($"{option.Key}. {option.Value}")</span>
+                    </label>
+                }
+            </div>
+        }
+
+        <button type="submit">Отправить ответы</button>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public int SessionId { get; set; }
+
+    private bool isLoading = true;
+    private bool isSubmitted = false;
+    private string? errorMessage;
+
+    private List<QuestionResponseDto>? questions;
+    private readonly Dictionary<int, string> _answers = new();
+    private TestResultResponseDto? result;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            questions = (await Backend.GetTestQuestionsAsync(SessionId)).ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Не удалось загрузить вопросы: " + ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private IEnumerable<KeyValuePair<string, string>> GetOptions(QuestionResponseDto q)
+    {
+        // соответствие: A/B/C/D
+        yield return new("A", q.option_a);
+        yield return new("B", q.option_b);
+        yield return new("C", q.option_c);
+        yield return new("D", q.option_d);
+    }
+
+    private void SelectAnswer(int questionId, string optionKey)
+    {
+        _answers[questionId] = optionKey;
+    }
+
+    private bool IsSelected(int questionId, string optionKey)
+    {
+        return _answers.TryGetValue(questionId, out var val) && val == optionKey;
+    }
+
+    private async Task SubmitTest()
+    {
+        if (questions is null || !questions.Any())
+            return;
+
+        var answers = questions
+            .Select(q =>
+            {
+                _answers.TryGetValue(q.id, out var ans);
+                return new TestAnswerSubmitDto(q.id, ans ?? "");
+            })
+            .ToList();
+
+        var submitDto = new TestSubmitDto(answers);
+
+        try
+        {
+            result = await Backend.SubmitTestAsync(SessionId, submitDto);
+            if (result is null)
+            {
+                errorMessage = "Ошибка при отправке теста.";
+                return;
+            }
+
+            isSubmitted = true;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Ошибка при отправке теста: " + ex.Message;
+        }
+    }
+
+    private void GoToTopics() => Nav.NavigateTo("/topics");
+    private void GoToHistory() => Nav.NavigateTo("/test/history");
+}

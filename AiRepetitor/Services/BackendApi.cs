@@ -1,5 +1,6 @@
-﻿using Microsoft.Extensions.AI;
+﻿using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Microsoft.Extensions.AI;
 
 namespace AiRepetitor.Services;
 
@@ -7,6 +8,7 @@ public sealed class BackendApi
 {
     private readonly HttpClient _http;
     private readonly ILogger<BackendApi> _logger;
+    private string? _token;   // JWT от FastAPI
 
     public BackendApi(IHttpClientFactory f, ILogger<BackendApi> logger)
     {
@@ -14,16 +16,88 @@ public sealed class BackendApi
         _logger = logger;
     }
 
+    // ========== AUTH (FastAPI /login) ==========
+
+    public async Task<bool> LoginAsync(string username, string password, CancellationToken ct = default)
+    {
+        var payload = new { username, password };
+
+        var resp = await _http.PostAsJsonAsync("/login", payload, ct);
+        if (!resp.IsSuccessStatusCode)
+        {
+            _logger.LogWarning("Backend login failed: {Status}", resp.StatusCode);
+            return false;
+        }
+
+        var token = await resp.Content.ReadFromJsonAsync<TokenDto>(cancellationToken: ct);
+        if (token?.access_token is null)
+        {
+            _logger.LogWarning("Backend login: no token");
+            return false;
+        }
+
+        _token = token.access_token;
+        _http.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token.access_token);
+
+        return true;
+    }
+
+    // ========== TOPICS (/topics) ==========
+
+    public async Task<IReadOnlyList<TopicResponseDto>> GetTopicsAsync(CancellationToken ct = default)
+    {
+        var topics = await _http.GetFromJsonAsync<List<TopicResponseDto>>("/topics", ct);
+        return topics ?? new();
+    }
+
+    public async Task<TopicResponseDto?> GetTopicAsync(int topicId, CancellationToken ct = default)
+    {
+        return await _http.GetFromJsonAsync<TopicResponseDto>($"/topics/{topicId}", ct);
+    }
+
+    // ========== TESTS ==========
+
+    public async Task<TestSessionResponseDto?> StartTestAsync(int topicId, CancellationToken ct = default)
+    {
+        var resp = await _http.PostAsync($"/topics/{topicId}/start-test", content: null, ct);
+        if (!resp.IsSuccessStatusCode)
+        {
+            _logger.LogWarning("StartTest failed: {Status}", resp.StatusCode);
+            return null;
+        }
+
+        return await resp.Content.ReadFromJsonAsync<TestSessionResponseDto>(cancellationToken: ct);
+    }
+
+    public async Task<IReadOnlyList<QuestionResponseDto>> GetTestQuestionsAsync(int sessionId, CancellationToken ct = default)
+    {
+        var questions = await _http.GetFromJsonAsync<List<QuestionResponseDto>>($"/test/{sessionId}/questions", ct);
+        return questions ?? new();
+    }
+
+    public async Task<TestResultResponseDto?> SubmitTestAsync(int sessionId, TestSubmitDto submit, CancellationToken ct = default)
+    {
+        var resp = await _http.PostAsJsonAsync($"/test/{sessionId}/submit", submit, ct);
+        if (!resp.IsSuccessStatusCode)
+        {
+            _logger.LogWarning("SubmitTest failed: {Status}", resp.StatusCode);
+            return null;
+        }
+
+        return await resp.Content.ReadFromJsonAsync<TestResultResponseDto>(cancellationToken: ct);
+    }
+
+    // ========== CHAT ==========
+
     public async Task<string> ChatAsync(string model, IReadOnlyList<ChatMessage> messages, CancellationToken ct = default)
     {
-        // Приводим ChatMessage (Microsoft.Extensions.AI) к формату твоего FastAPI
         var payload = new
         {
             model,
             stream = false,
             options = new Dictionary<string, object>(),
             messages = messages
-                .Where(m => m.Role != ChatRole.System) // system можно оставить/убрать, как тебе нужно
                 .Select(m => new { role = m.Role.ToString().ToLowerInvariant(), content = m.Text })
                 .ToList()
         };
@@ -36,6 +110,31 @@ public sealed class BackendApi
         var json = await resp.Content.ReadFromJsonAsync<OllamaChatResponse>(cancellationToken: ct);
         return json?.message?.content ?? "";
     }
+
+    public async Task<bool> RegisterAsync(string email, string password, CancellationToken ct = default)
+{
+    var payload = new
+    {
+        username = email,  // используем email как username
+        email = email,
+        password = password
+    };
+
+    var resp = await _http.PostAsJsonAsync("/register", payload, ct);
+    return resp.IsSuccessStatusCode;
+}
+    // ========== TEST HISTORY ==========
+
+    public async Task<IReadOnlyList<TestSessionResponseDto>> GetTestHistoryAsync(
+        int skip = 0,
+        int limit = 20,
+        CancellationToken ct = default)
+    {
+        var url = $"/test/history?skip={skip}&limit={limit}";
+        var tests = await _http.GetFromJsonAsync<List<TestSessionResponseDto>>(url, ct);
+        return tests ?? new List<TestSessionResponseDto>();
+    }
+
 
     private sealed class OllamaChatResponse
     {

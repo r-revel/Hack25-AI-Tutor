@@ -1,0 +1,85 @@
+@using AiRepetitor.Services
+@inject BackendApi Backend
+
+@if (Show)
+{
+    <div class="history-backdrop" @onclick="OnBackdropClick">
+        <div class="history-panel" @onclick:stopPropagation="true">
+            <div class="history-panel__header">
+                <span>История тестов</span>
+                <button class="history-panel__close" @onclick="Close">✕</button>
+            </div>
+            <div class="history-panel__body">
+                @if (isLoading)
+                {
+                    <p>Загрузка...</p>
+                }
+                else if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <p style="color:red">@errorMessage</p>
+                }
+                else if (tests is null || !tests.Any())
+                {
+                    <p>Вы ещё не проходили тесты.</p>
+                }
+                else
+                {
+                    <table class="test-history-table">
+                        <thead>
+                        <tr>
+                            <th>Сессия</th>
+                            <th>Тема (id)</th>
+                            <th>Начат</th>
+                            <th>Баллы</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var t in tests)
+                        {
+                            <tr>
+                                <td>@t.id</td>
+                                <td>@t.topic_id</td>
+                                <td>@t.started_at.ToLocalTime().ToString("g")</td>
+                                <td>@(t.total_score?.ToString() ?? "-")</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Show { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private bool isLoading = false;
+    private string? errorMessage;
+    private List<TestSessionResponseDto>? tests;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Show && tests is null && !isLoading)
+        {
+            isLoading = true;
+            try
+            {
+                tests = (await Backend.GetTestHistoryAsync()).ToList();
+            }
+            catch (Exception ex)
+            {
+                errorMessage = "Не удалось загрузить историю: " + ex.Message;
+            }
+            finally
+            {
+                isLoading = false;
+            }
+        }
+    }
+
+    private async Task Close() => await OnClose.InvokeAsync();
+
+    private async Task OnBackdropClick() => await OnClose.InvokeAsync();
+}

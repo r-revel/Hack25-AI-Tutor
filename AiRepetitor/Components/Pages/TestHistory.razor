@@ -1,0 +1,82 @@
+<!--AiRepetitor/Components/Pages/TestHistory.razor -->
+@page "/test/history"
+@attribute [Authorize]
+@using AiRepetitor.Services
+@using Microsoft.AspNetCore.Authorization
+@inject BackendApi Backend
+@inject NavigationManager Nav
+
+<h3>История тестов</h3>
+
+@if (isLoading)
+{
+    <p>Загрузка...</p>
+}
+else if (errorMessage is not null)
+{
+    <p style="color:red">@errorMessage</p>
+}
+else if (tests is null || !tests.Any())
+{
+    <p>Вы ещё не проходили тесты.</p>
+}
+else
+{
+    <table class="test-history-table">
+        <thead>
+            <tr>
+                <th>Сессия</th>
+                <th>Тема (id)</th>
+                <th>Начат</th>
+                <th>Завершён</th>
+                <th>Баллы</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var t in tests)
+        {
+            <tr>
+                <td>@t.id</td>
+                <td>@t.topic_id</td>
+                <td>@t.started_at.ToLocalTime().ToString("g")</td>
+                <td>@(t.completed_at?.ToLocalTime().ToString("g") ?? "-")</td>
+                <td>@(t.total_score?.ToString() ?? "-")</td>
+                <td>
+                    @if (t.completed_at is not null)
+                    {
+                        <button @onclick="() => OpenSession(t.id)">Открыть</button>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+    private bool isLoading = true;
+    private string? errorMessage;
+    private List<TestSessionResponseDto>? tests;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            tests = (await Backend.GetTestHistoryAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Не удалось загрузить историю: " + ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenSession(int id)
+    {
+        Nav.NavigateTo($"/test/{id}");
+    }
+}

@@ -1,0 +1,48 @@
+@page "/topics"
+@attribute [Authorize]
+@using AiRepetitor.Services
+@using Microsoft.AspNetCore.Authorization
+@inject BackendApi Backend
+@inject NavigationManager Nav
+
+<h3>Темы</h3>
+
+@if (topics is null)
+{
+    <p>Загрузка...</p>
+}
+else if (!topics.Any())
+{
+    <p>Тем пока нет.</p>
+}
+else
+{
+    <ul>
+        @foreach (var t in topics)
+        {
+            <li>
+                <b>@t.title</b> — @t.description
+                <button @onclick="() => StartTest(t.id)">Начать тест</button>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private List<TopicResponseDto>? topics;
+
+    protected override async Task OnInitializedAsync()
+    {
+        topics = (await Backend.GetTopicsAsync()).ToList();
+    }
+
+    private async Task StartTest(int topicId)
+    {
+        var session = await Backend.StartTestAsync(topicId);
+        if (session is not null)
+        {
+            // идём на страницу прохождения теста
+            Nav.NavigateTo($"/test/{session.id}");
+        }
+    }
+}
