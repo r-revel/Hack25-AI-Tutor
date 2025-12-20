@@ -9,21 +9,8 @@ from langchain_core.runnables import RunnablePassthrough
 import re
 from num2words import num2words
 
-# 1. Инициализация эмбеддингов через LangChain
-embeddings = SentenceTransformerEmbeddings(
-    model_name="intfloat/multilingual-e5-small"
-)
-
-# 2. Инициализация векторной базы через LangChain
-vectorstore = Chroma(
-    collection_name="docs",
-    embedding_function=embeddings,
-    persist_directory="./chroma_db"
-)
-
-# 3. Инициализация LLM
+# Инициализация LLM
 llm = Ollama(model="mistral")
-
 
 def generate_questions_from_book(num_questions: int, book_json: Dict) -> List[Dict]:
     """

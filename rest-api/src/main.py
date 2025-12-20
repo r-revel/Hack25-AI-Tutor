@@ -5,6 +5,8 @@ from datetime import timedelta
 from typing import List
 import crud
 import lib.schemas as schemas
+from lib.install import InstallSystem
+from lib.swear_detector import RussianSwearDetector
 import auth
 import models
 from database import engine, get_db, create_db_and_tables
@@ -16,7 +18,7 @@ from typing import Dict, Any, AsyncGenerator
 from pydantic import BaseModel
 import asyncio
 from datetime import datetime
-#from lib.creater_question import generate_questions_from_book
+# from lib.creater_question import generate_questions_from_book
 
 
 # Create database tables
@@ -62,6 +64,20 @@ def login(user_login: schemas.UserLogin, db: Session = Depends(get_db)):
     return {"access_token": access_token, "token_type": "bearer"}
 
 
+@app.get("/install", response_model=str)
+def install_model(
+    current_user: models.User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    # Создаем систему установки с списком моделей
+    models_to_install = ["mistral", "intfloat/multilingual-e5-large"]
+    installer = InstallSystem(models_to_install)
+
+    # Устанавливаем модели
+    results = installer.install()
+    return f"Результаты установки: {results}"
+
+
 @app.get("/topics", response_model=List[schemas.TopicResponse])
 def get_topics(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     topics = crud.get_topics(db, skip=skip, limit=limit)
@@ -87,7 +103,7 @@ def get_progress(
     return progress
 
 
-@app.post("/topics/{topic_id}/progress", response_model=schemas.UserProgressResponse)
+@app.post("/topics/{topic_id}/progress", response_model=List[schemas.UserProgressResponse])
 def add_progress_message(
     topic_id: int,
     progress: schemas.UserProgressCreate,
@@ -99,11 +115,45 @@ def add_progress_message(
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
 
-    return crud.create_user_progress(
-        db=db,
-        progress=progress,
-        user_id=current_user.id
-    )
+    detector = RussianSwearDetector(model_name='mistral')
+
+    result = detector.check(progress.message)
+
+    if result['has_swear'] == True:
+        progress.message = '************'
+        crud.create_user_progress(
+            db=db,
+            progress=progress,
+            user_id=current_user.id
+        )
+        crud.create_user_progress(
+            db=db,
+            progress=schemas.UserProgressCreate(
+                topic_id=topic_id,
+                is_user=False,
+                message='Недопустимо использования ненормативной лексики'
+            ),
+            user_id=current_user.id
+        )
+    else:
+        crud.create_user_progress(
+            db=db,
+            progress=progress,
+            user_id=current_user.id
+        )
+        crud.create_user_progress(
+            db=db,
+            progress=schemas.UserProgressCreate(
+                topic_id=topic_id,
+                is_user=False,
+                message='Системное сообщения'
+            ),
+            user_id=current_user.id
+        )
+
+    progress_list = crud.get_user_progress(
+        db, user_id=current_user.id, topic_id=topic_id)
+    return progress_list
 
 
 @app.post("/topics/{topic_id}/start-test", response_model=schemas.TestSessionResponse)
@@ -263,9 +313,8 @@ def get_generated_questions(
             topic_id=topic_id
         )
         crud.create_question(db=db, question=question_create)
-    
-    return "success"
 
+    return "success"
 
 
 @app.post("/admin/topics", response_model=schemas.TopicResponse)
