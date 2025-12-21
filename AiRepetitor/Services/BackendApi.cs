@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Headers;
+﻿//BackendApi.cs
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using Microsoft.Extensions.AI;
@@ -156,6 +157,36 @@ public sealed class BackendApi
     // ⚠️ временно: пароль = email (или фиксированный)
     // лучше сделать отдельный сервисный логин
     return await LoginAsync(email, email, ct);
+}
+
+// ========== PROGRESS ==========
+
+public async Task<IReadOnlyList<UserProgressResponseDto>> GetTopicProgressAsync(
+    int topicId,
+    CancellationToken ct = default)
+{
+    var resp = await _http.GetFromJsonAsync<List<UserProgressResponseDto>>(
+        $"/topics/{topicId}/progress", ct);
+
+    return resp ?? new();
+}
+
+public async Task<UserProgressResponseDto?> SendTopicMessageAsync(
+    int topicId,
+    string message,
+    CancellationToken ct = default)
+{
+    var payload = new { message };
+
+    var resp = await _http.PostAsJsonAsync(
+        $"/topics/{topicId}/progress",
+        payload,
+        ct);
+
+    if (!resp.IsSuccessStatusCode)
+        return null;
+
+    return await resp.Content.ReadFromJsonAsync<UserProgressResponseDto>(ct);
 }
 
 
