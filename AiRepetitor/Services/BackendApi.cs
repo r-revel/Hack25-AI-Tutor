@@ -1,5 +1,6 @@
 ﻿using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using Microsoft.Extensions.AI;
 
 namespace AiRepetitor.Services;
@@ -126,14 +127,36 @@ public sealed class BackendApi
     // ========== TEST HISTORY ==========
 
     public async Task<IReadOnlyList<TestSessionResponseDto>> GetTestHistoryAsync(
-        int skip = 0,
-        int limit = 20,
-        CancellationToken ct = default)
-    {
-        var url = $"/test/history?skip={skip}&limit={limit}";
-        var tests = await _http.GetFromJsonAsync<List<TestSessionResponseDto>>(url, ct);
-        return tests ?? new List<TestSessionResponseDto>();
-    }
+    ClaimsPrincipal user,
+    int skip = 0,
+    int limit = 20,
+    CancellationToken ct = default)
+{
+    var ok = await EnsureBackendLoginAsync(user, ct);
+    if (!ok)
+        return [];
+
+    var url = $"/test/history?skip={skip}&limit={limit}";
+    var tests = await _http.GetFromJsonAsync<List<TestSessionResponseDto>>(url, ct);
+    return tests ?? [];
+}
+
+
+    public async Task<bool> EnsureBackendLoginAsync(
+    ClaimsPrincipal user,
+    CancellationToken ct = default)
+{
+    if (_token != null)
+        return true;
+
+    var email = user.Identity?.Name;
+    if (string.IsNullOrEmpty(email))
+        return false;
+
+    // ⚠️ временно: пароль = email (или фиксированный)
+    // лучше сделать отдельный сервисный логин
+    return await LoginAsync(email, email, ct);
+}
 
 
     private sealed class OllamaChatResponse

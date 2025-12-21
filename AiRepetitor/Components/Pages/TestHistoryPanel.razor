@@ -1,5 +1,9 @@
+<!--AiRepetitor\Components\Pages\TestHistoryPanel.razor!-->
 @using AiRepetitor.Services
 @inject BackendApi Backend
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthStateProvider
+
 
 @if (Show)
 {
@@ -60,24 +64,30 @@
     private List<TestSessionResponseDto>? tests;
 
     protected override async Task OnParametersSetAsync()
+{
+    if (Show && tests is null && !isLoading)
     {
-        if (Show && tests is null && !isLoading)
+        isLoading = true;
+        errorMessage = null;
+
+        try
         {
-            isLoading = true;
-            try
-            {
-                tests = (await Backend.GetTestHistoryAsync()).ToList();
-            }
-            catch (Exception ex)
-            {
-                errorMessage = "Не удалось загрузить историю: " + ex.Message;
-            }
-            finally
-            {
-                isLoading = false;
-            }
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            tests = (await Backend.GetTestHistoryAsync(user)).ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Не удалось загрузить историю: " + ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
         }
     }
+}
+
 
     private async Task Close() => await OnClose.InvokeAsync();
 

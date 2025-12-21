@@ -5,6 +5,7 @@
 @using Microsoft.AspNetCore.Authorization
 @inject BackendApi Backend
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
 
 <h3>История тестов</h3>
 
@@ -60,20 +61,22 @@ else
     private List<TestSessionResponseDto>? tests;
 
     protected override async Task OnInitializedAsync()
+{
+    try
     {
-        try
-        {
-            tests = (await Backend.GetTestHistoryAsync()).ToList();
-        }
-        catch (Exception ex)
-        {
-            errorMessage = "Не удалось загрузить историю: " + ex.Message;
-        }
-        finally
-        {
-            isLoading = false;
-        }
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        tests = (await Backend.GetTestHistoryAsync(auth.User)).ToList();
     }
+    catch (Exception ex)
+    {
+        errorMessage = "Не удалось загрузить историю: " + ex.Message;
+    }
+    finally
+    {
+        isLoading = false;
+    }
+}
+
 
     private void OpenSession(int id)
     {

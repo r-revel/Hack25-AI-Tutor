@@ -234,3 +234,68 @@ h1:focus {
     color: #B91C1C;
     margin-bottom: 0.25rem;
 }
+
+/* === CHAT TOOLBAR ===================================== */
+
+.chat-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    padding: 0.75rem 1.25rem;
+    background: #ffffff;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+.chat-app-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.chat-toolbar__right {
+    display: flex;
+    gap: 1.25rem;
+    align-items: center;
+}
+
+.chat-link {
+    background: none;
+    border: none;
+    padding: 0;
+
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+
+    cursor: pointer;
+    position: relative;
+}
+
+.chat-link::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -3px;
+    width: 100%;
+    height: 2px;
+    background: #4152d5;
+    transform: scaleX(0);
+    transition: transform .15s ease;
+}
+
+.chat-link:hover {
+    color: #111827;
+}
+
+.chat-link:hover::after {
+    transform: scaleX(1);
+}
+
+.chat-link--danger {
+    color: #B91C1C;
+}
+
+.chat-link--danger::after {
+    background: #B91C1C;
+}
