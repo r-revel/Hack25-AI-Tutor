@@ -1,3 +1,4 @@
+/*Chat.razor.css*/
 /* Chat container (input + suggestions) */
 .chat-container {
     position: sticky;
@@ -75,6 +76,7 @@
     background: #F3F4F6;
     color: #374151;
 }
+
 
 /* ================= CHAT SUGGESTIONS & INPUT ================= */
 .chat-suggestions,

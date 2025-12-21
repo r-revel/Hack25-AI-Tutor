@@ -1,51 +1,50 @@
-<!--AiRepetitor/Components/Pages/Chat/CreateTopic.razor-->
 @page "/create-topic"
 @inject BackendApi BackendApi
 @inject NavigationManager Nav
-@inject ILogger<CreateTopic> Logger
 
-@using AiRepetitor.Services
+<PageTitle>Создание новой темы</PageTitle>
+
 @using Microsoft.AspNetCore.Components.Authorization
 
-<PageTitle>Создание нового топика</PageTitle>
-
 <AuthorizeView>
-    <Authorized Context="authContext">
-        <h3>Создание нового топика</h3>
-        
-        @if (!string.IsNullOrEmpty(errorMessage))
-        {
-            <div class="alert alert-danger">@errorMessage</div>
-        }
-        
-        @if (isSuccess)
-        {
-            <div class="alert alert-success">Топик успешно создан!</div>
-        }
-        
-        <EditForm Model="@newTopic" OnValidSubmit="HandleSubmit">
-            <DataAnnotationsValidator />
-            <ValidationSummary />
-            
-            <div class="form-group">
-                <label for="name">Название топика:</label>
-                <InputText id="name" class="form-control" @bind-Value="newTopic.Name" />
-                <ValidationMessage For="@(() => newTopic.Name)" />
-            </div>
+    <Authorized Context="authorizedContext">
+        <div class="create-topic-form">
+            <h3 class="create-topic-header">Создание нового топика</h3>
 
-            <div class="form-group">
-                <label for="description">Описание:</label>
-                <InputTextArea id="description" class="form-control" @bind-Value="newTopic.Description" />
-                <ValidationMessage For="@(() => newTopic.Description)" />
-            </div>
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">@errorMessage</div>
+            }
 
-            <div class="form-group">
-                <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
-                    @(isSubmitting ? "Создание..." : "Создать топик")
-                </button>
-                <button type="button" class="btn btn-secondary" @onclick="Cancel">Отмена</button>
-            </div>
-        </EditForm>
+            @if (isSuccess)
+            {
+                <div class="alert alert-success">Топик успешно создан!</div>
+            }
+
+            <EditForm Model="@newTopic" OnValidSubmit="HandleSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="form-group">
+                    <label for="name">Название топика:</label>
+                    <InputText id="name" class="create-topic-input" @bind-Value="newTopic.Name" />
+                    <ValidationMessage For="@(() => newTopic.Name)" />
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Описание:</label>
+                    <InputTextArea id="description" class="create-topic-input" @bind-Value="newTopic.Description" />
+                    <ValidationMessage For="@(() => newTopic.Description)" />
+                </div>
+
+                <div class="form-group">
+                    <button type="submit" class="create-topic-button" disabled="@isSubmitting">
+                        @(isSubmitting ? "Создание..." : "Создать топик")
+                    </button>
+                    <button type="button" class="create-topic-cancel-button" @onclick="Cancel">Отмена</button>
+                </div>
+            </EditForm>
+        </div>
     </Authorized>
 </AuthorizeView>
 
@@ -63,13 +62,12 @@
     {
         isSubmitting = true;
         errorMessage = string.Empty;
-        
+
         try
         {
-            // Вызов API для создания топика
-            var success = await BackendApi.CreateTopicAsync(newTopic);
+            var result = await BackendApi.CreateTopicAsync(newTopic);
 
-            if (success)
+            if (result != null)
             {
                 isSuccess = true;
                 await Task.Delay(1500); // Показать сообщение об успехе 1.5 секунды
@@ -82,13 +80,11 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error creating topic");
             errorMessage = $"Ошибка при создании топика: {ex.Message}";
         }
         finally
         {
             isSubmitting = false;
-            StateHasChanged();
         }
     }
 
