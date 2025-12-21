@@ -18,6 +18,20 @@ public sealed record TopicResponseDto(
     string json
 );
 
+public class TopicCreateDto
+{
+    public string Name { get; set; }
+    public string Description { get; set; }
+
+    // You can add a constructor if you want to initialize with default values
+    public TopicCreateDto(string name = "", string description = "")
+    {
+        Name = name;
+        Description = description;
+    }
+}
+
+
 // ---------- QUESTIONS / TESTS ----------
 
 public sealed record QuestionResponseDto(

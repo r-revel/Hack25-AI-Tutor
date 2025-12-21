@@ -171,7 +171,21 @@ public async Task<IReadOnlyList<UserProgressResponseDto>> GetTopicProgressAsync(
     return resp ?? new();
 }
 
-public async Task<UserProgressResponseDto?> SendTopicMessageAsync(
+    // In BackendApi.cs
+
+    public async Task<bool> CreateTopicAsync(TopicCreateDto newTopic, CancellationToken ct = default)
+    {
+        var resp = await _http.PostAsJsonAsync("/topics", newTopic, ct);
+        if (!resp.IsSuccessStatusCode)
+        {
+            _logger.LogWarning("Failed to create topic: {Status}", resp.StatusCode);
+            return false;
+        }
+
+        return true;
+    }
+
+    public async Task<UserProgressResponseDto?> SendTopicMessageAsync(
     int topicId,
     string message,
     CancellationToken ct = default)

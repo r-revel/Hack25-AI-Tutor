@@ -1,0 +1,99 @@
+<!--AiRepetitor/Components/Pages/Chat/CreateTopic.razor-->
+@page "/create-topic"
+@inject BackendApi BackendApi
+@inject NavigationManager Nav
+@inject ILogger<CreateTopic> Logger
+
+@using AiRepetitor.Services
+@using Microsoft.AspNetCore.Components.Authorization
+
+<PageTitle>Создание нового топика</PageTitle>
+
+<AuthorizeView>
+    <Authorized Context="authContext">
+        <h3>Создание нового топика</h3>
+        
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+        
+        @if (isSuccess)
+        {
+            <div class="alert alert-success">Топик успешно создан!</div>
+        }
+        
+        <EditForm Model="@newTopic" OnValidSubmit="HandleSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            
+            <div class="form-group">
+                <label for="name">Название топика:</label>
+                <InputText id="name" class="form-control" @bind-Value="newTopic.Name" />
+                <ValidationMessage For="@(() => newTopic.Name)" />
+            </div>
+
+            <div class="form-group">
+                <label for="description">Описание:</label>
+                <InputTextArea id="description" class="form-control" @bind-Value="newTopic.Description" />
+                <ValidationMessage For="@(() => newTopic.Description)" />
+            </div>
+
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                    @(isSubmitting ? "Создание..." : "Создать топик")
+                </button>
+                <button type="button" class="btn btn-secondary" @onclick="Cancel">Отмена</button>
+            </div>
+        </EditForm>
+    </Authorized>
+</AuthorizeView>
+
+<NotAuthorized>
+    <p>Вы не авторизованы для создания топиков.</p>
+</NotAuthorized>
+
+@code {
+    private TopicCreateDto newTopic = new TopicCreateDto("Default Name", "Default Description");
+    private string errorMessage = string.Empty;
+    private bool isSuccess = false;
+    private bool isSubmitting = false;
+
+    private async Task HandleSubmit()
+    {
+        isSubmitting = true;
+        errorMessage = string.Empty;
+        
+        try
+        {
+            // Вызов API для создания топика
+            var success = await BackendApi.CreateTopicAsync(newTopic);
+
+            if (success)
+            {
+                isSuccess = true;
+                await Task.Delay(1500); // Показать сообщение об успехе 1.5 секунды
+                Nav.NavigateTo("/topics");
+            }
+            else
+            {
+                errorMessage = "Не удалось создать топик. Проверьте данные и попробуйте снова.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error creating topic");
+            errorMessage = $"Ошибка при создании топика: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel()
+    {
+        Nav.NavigateTo("/topics");
+    }
+}
