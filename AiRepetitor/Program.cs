@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Components.Authorization;
 using AiRepetitor.Data;
 using Microsoft.AspNetCore.DataProtection;
+using Blazored.LocalStorage;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -76,6 +77,8 @@ builder.Services.AddSingleton<IVectorStore>(vectorStore);
 
 builder.Services.AddScoped<DataIngestor>();
 builder.Services.AddSingleton<SemanticSearch>();
+builder.Services.AddBlazoredLocalStorage();
+
 
 // ==== кеш загрузок ====
 builder.Services.AddDbContext<IngestionCacheDbContext>(options =>

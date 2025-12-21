@@ -7,6 +7,8 @@
 @inject NavigationManager Nav
 
 @implements IDisposable
+@using Blazored.LocalStorage
+@inject ILocalStorageService LocalStorage
 
 <PageTitle>Chat</PageTitle>
 
@@ -71,18 +73,18 @@
 
 @code {
     private const string SystemPrompt = @"
-You are an assistant who answers questions about information you retrieve.
-Do not answer questions about anything else.
-Use only simple markdown to format your responses.
+    You are an assistant who answers questions about information you retrieve.
+    Do not answer questions about anything else.
+    Use only simple markdown to format your responses.
 
-Use the search tool to find relevant information. When you do this, end your
-reply with citations in the special XML format:
+    Use the search tool to find relevant information. When you do this, end your
+    reply with citations in the special XML format:
 
-<citation filename='string' page_number='number'>exact quote here</citation>
+    <citation filename='string' page_number='number'>exact quote here</citation>
 
-Always include the citation in your response if there are results.
-The quote must be max 5 words, taken word-for-word from the search result, and is the basis for why the citation is relevant.
-";
+    Always include the citation in your response if there are results.
+    The quote must be max 5 words, taken word-for-word from the search result, and is the basis for why the citation is relevant.
+    ";
 
     private readonly ChatOptions chatOptions = new();
     private readonly List<ChatMessage> messages = new();
@@ -97,9 +99,19 @@ The quote must be max 5 words, taken word-for-word from the search result, and i
     private ChatInput? chatInput;
     private ChatSuggestions? chatSuggestions;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        messages.Add(new(ChatRole.System, SystemPrompt));
+        // Попробуем загрузить сохраненные сообщения
+        var savedMessages = await LocalStorage.GetItemAsync<List<ChatMessage>>("chatMessages");
+        if (savedMessages != null)
+        {
+            messages.AddRange(savedMessages);
+        }
+        else
+        {
+            messages.Add(new(ChatRole.System, SystemPrompt));
+        }
+
         chatOptions.Tools = new[] { AIFunctionFactory.Create(SearchAsync) };
     }
 
@@ -120,6 +132,9 @@ The quote must be max 5 words, taken word-for-word from the search result, and i
 
         messages.Add(new(ChatRole.Assistant, assistantText));
         chatSuggestions?.Update(messages);
+
+        // Сохранить обновленные сообщения в LocalStorage
+        await LocalStorage.SetItemAsync("chatMessages", messages);
     }
 
     private void CancelAnyCurrentResponse()
@@ -135,6 +150,9 @@ The quote must be max 5 words, taken word-for-word from the search result, and i
         messages.Add(new(ChatRole.System, SystemPrompt));
         chatSuggestions?.Clear();
         await chatInput!.FocusAsync();
+
+        // Сбросить сохраненные сообщения в LocalStorage
+        await LocalStorage.RemoveItemAsync("chatMessages");
     }
 
     private async Task<IEnumerable<string>> SearchAsync(string searchPhrase, string? filenameFilter = null)
