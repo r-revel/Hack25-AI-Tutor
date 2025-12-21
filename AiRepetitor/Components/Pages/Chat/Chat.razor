@@ -1,36 +1,53 @@
 ﻿<!-- AiRepetitor/Components/Pages/Chat/Chat.razor -->
 @page "/"
+
 @using System.ComponentModel
 @using Microsoft.AspNetCore.Authorization
 @inject BackendApi BackendApi
 @inject SemanticSearch Search
+@inject NavigationManager Nav
 
-@attribute [Authorize]
 @implements IDisposable
 
 <PageTitle>Chat</PageTitle>
 
-<ChatHeader OnNewChat="@ResetConversationAsync" />
+<AuthorizeView>
+    <Authorized>
 
-<ChatMessageList Messages="@messages" InProgressMessage="@currentResponseMessage">
-    <NoMessagesContent>
-        <div>
-            To get started, try asking about these example documents.
-            You can replace these with your own data and replace this message.
+        <nav class="top-nav">
+            <button @onclick="@(() => Nav.NavigateTo("/topics"))">Темы</button>
+            <button @onclick="@(() => Nav.NavigateTo("/test/history"))">История тестов</button>
+
+            <form method="post" action="/logout" style="display:inline">
+                <button type="submit">Выйти</button>
+            </form>
+        </nav>
+
+        <ChatHeader OnNewChat="@ResetConversationAsync" />
+
+        <ChatMessageList Messages="@messages" InProgressMessage="@currentResponseMessage">
+            <NoMessagesContent>
+                <div>
+                    To get started, try asking about these example documents.
+                </div>
+            </NoMessagesContent>
+        </ChatMessageList>
+
+        <div class="chat-container">
+            <ChatSuggestions OnSelected="@AddUserMessageAsync" @ref="@chatSuggestions" />
+            <ChatInput OnSend="@AddUserMessageAsync" @ref="@chatInput" />
+            <SurveyPrompt />
         </div>
-        <ChatCitation File="Example_Emergency_Survival_Kit.pdf" />
-        <ChatCitation File="Example_GPS_Watch.pdf" />
-    </NoMessagesContent>
-</ChatMessageList>
 
-<div class="chat-container">
-    <ChatSuggestions OnSelected="@AddUserMessageAsync" @ref="@chatSuggestions" />
-    <ChatInput OnSend="@AddUserMessageAsync" @ref="@chatInput" />
-    <SurveyPrompt />
-</div>
+    </Authorized>
+
+    <NotAuthorized>
+        <AuthModal />
+    </NotAuthorized>
+</AuthorizeView>
 
 @code {
-    private const string SystemPrompt = @"
+        private const string SystemPrompt = @"
         You are an assistant who answers questions about information you retrieve.
         Do not answer questions about anything else.
         Use only simple markdown to format your responses.
@@ -45,6 +62,7 @@
         The quote must be max 5 words, taken word-for-word from the search result, and is the basis for why the citation is relevant.
         Don't refer to the presence of citations; just emit these tags right at the end, with no surrounding text.
     ";
+
 
     private readonly ChatOptions chatOptions = new();
     private readonly List<ChatMessage> messages = new();
@@ -80,11 +98,6 @@
 
     private void CancelAnyCurrentResponse()
     {
-        if (currentResponseMessage is not null)
-        {
-            messages.Add(currentResponseMessage);
-        }
-
         currentResponseCancellation?.Cancel();
         currentResponseMessage = null;
     }
@@ -98,18 +111,15 @@
         await chatInput!.FocusAsync();
     }
 
-    [Description("Searches for information using a phrase or keyword")]
-    private async Task<IEnumerable<string>> SearchAsync(
-        [Description("The phrase to search for.")] string searchPhrase,
-        [Description("If possible, specify the filename to search that file only. If not provided or empty, the search includes all files.")]
-        string? filenameFilter = null)
+    private async Task<IEnumerable<string>> SearchAsync(string searchPhrase, string? filenameFilter = null)
     {
-        await InvokeAsync(StateHasChanged);
         var results = await Search.SearchAsync(searchPhrase, filenameFilter, maxResults: 5);
-        return results.Select(result =>
-            $"<result filename=\"{result.FileName}\" page_number=\"{result.PageNumber}\">{result.Text}</result>");
+        return results.Select(r =>
+            $"<result filename=\"{r.FileName}\" page_number=\"{r.PageNumber}\">{r.Text}</result>");
     }
 
     public void Dispose()
         => currentResponseCancellation?.Cancel();
 }
+
+

@@ -1,8 +1,3 @@
-<!--AiRepetitor\Components\AuthModal.razor-->
-@using Microsoft.AspNetCore.Identity
-@using System.ComponentModel.DataAnnotations
-@inject SignInManager<IdentityUser> SignInManager
-@inject UserManager<IdentityUser> UserManager
 @inject NavigationManager Nav
 
 <div class="auth-backdrop">
@@ -25,67 +20,72 @@
 
             @if (!string.IsNullOrEmpty(errorMessage))
             {
-                <div class="auth-alert">
-                    @errorMessage
-                </div>
+                <div class="auth-alert">@errorMessage</div>
             }
 
             @if (isLoginMode)
             {
-                <EditForm Model="@loginModel" OnValidSubmit="@HandleLoginAsync">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary class="auth-validation-summary" />
+                <!-- ВАЖНО: обычная HTML-форма -->
+                <form method="post" action="/auth/login">
+                    <input type="hidden" name="ReturnUrl" value="/" />
 
                     <div class="auth-field">
-                        <label class="auth-label">E-mail</label>
-                        <InputText class="auth-input" @bind-Value="loginModel.Email" />
-                        <ValidationMessage For="@(() => loginModel.Email)" class="auth-validation" />
+                        <label>E-mail</label>
+                        <input name="Email"
+                               class="auth-input"
+                               required
+                               type="email" />
                     </div>
 
                     <div class="auth-field">
-                        <label class="auth-label">Пароль</label>
-                        <InputText class="auth-input" type="password" @bind-Value="loginModel.Password" />
-                        <ValidationMessage For="@(() => loginModel.Password)" class="auth-validation" />
+                        <label>Пароль</label>
+                        <input name="Password"
+                               class="auth-input"
+                               required
+                               type="password" />
                     </div>
 
                     <div class="auth-field auth-field--horizontal">
-                        <InputCheckbox class="auth-checkbox" @bind-Value="loginModel.RememberMe" />
-                        <label class="auth-label-inline">Запомнить меня</label>
+                        <input type="checkbox" name="RememberMe" />
+                        <label>Запомнить меня</label>
                     </div>
 
                     <button type="submit" class="auth-button-primary">
                         Войти
                     </button>
-                </EditForm>
+                </form>
             }
             else
             {
-                <EditForm Model="@registerModel" OnValidSubmit="@HandleRegisterAsync">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary class="auth-validation-summary" />
-
+                <form method="post" action="/auth/register">
                     <div class="auth-field">
-                        <label class="auth-label">E-mail</label>
-                        <InputText class="auth-input" @bind-Value="registerModel.Email" />
-                        <ValidationMessage For="@(() => registerModel.Email)" class="auth-validation" />
+                        <label>E-mail</label>
+                        <input name="Email"
+                               class="auth-input"
+                               required
+                               type="email" />
                     </div>
 
                     <div class="auth-field">
-                        <label class="auth-label">Пароль</label>
-                        <InputText class="auth-input" type="password" @bind-Value="registerModel.Password" />
-                        <ValidationMessage For="@(() => registerModel.Password)" class="auth-validation" />
+                        <label>Пароль</label>
+                        <input name="Password"
+                               class="auth-input"
+                               required
+                               type="password" />
                     </div>
 
                     <div class="auth-field">
-                        <label class="auth-label">Повтор пароля</label>
-                        <InputText class="auth-input" type="password" @bind-Value="registerModel.ConfirmPassword" />
-                        <ValidationMessage For="@(() => registerModel.ConfirmPassword)" class="auth-validation" />
+                        <label>Повтор пароля</label>
+                        <input name="ConfirmPassword"
+                               class="auth-input"
+                               required
+                               type="password" />
                     </div>
 
                     <button type="submit" class="auth-button-primary">
                         Зарегистрироваться
                     </button>
-                </EditForm>
+                </form>
             }
         </div>
     </div>
@@ -95,93 +95,9 @@
     private bool isLoginMode = true;
     private string? errorMessage;
 
-    private readonly LoginModel loginModel = new();
-    private readonly RegisterModel registerModel = new();
-
     private void SwitchMode(bool login)
     {
         isLoginMode = login;
         errorMessage = null;
-    }
-
-    @* private async Task HandleLoginAsync()
-    {
-        errorMessage = null;
-
-        var result = await SignInManager.PasswordSignInAsync(
-            loginModel.Email,
-            loginModel.Password,
-            loginModel.RememberMe,
-            lockoutOnFailure: false);
-
-        if (result.Succeeded)
-        {
-            // Обновляем страницу, чтобы подтянулось новое состояние аутентификации
-            Nav.NavigateTo(Nav.Uri, forceLoad: true);
-        }
-        else
-        {
-            errorMessage = "Неверный логин или пароль";
-        }
-    } *@
-
-private async Task HandleLoginAsync()
-{
-    errorMessage = "Логин сейчас не активен (cookie аутентификация отключена внутри компонента).";
-}
-    private async Task HandleRegisterAsync()
-{
-    errorMessage = null;
-
-    var user = new IdentityUser
-    {
-        UserName = registerModel.Email,
-        Email = registerModel.Email
-    };
-
-    var result = await UserManager.CreateAsync(user, registerModel.Password);
-
-    if (result.Succeeded)
-    {
-        // НЕ вызываем SignInAsync — из Blazor-сокета нельзя безопасно ставить cookie
-        // Переключаемся на вкладку "Вход" и подставляем e-mail
-        isLoginMode = true;
-        loginModel.Email = registerModel.Email;
-        loginModel.Password = string.Empty;
-
-        errorMessage = "Аккаунт создан. Введите пароль, чтобы войти.";
-        StateHasChanged();
-    }
-    else
-    {
-        errorMessage = string.Join("; ", result.Errors.Select(e => e.Description));
-    }
-}
-
-
-    public class LoginModel
-    {
-        [Required, EmailAddress]
-        public string Email { get; set; } = string.Empty;
-
-        [Required, DataType(DataType.Password)]
-        public string Password { get; set; } = string.Empty;
-
-        public bool RememberMe { get; set; }
-    }
-
-    public class RegisterModel
-    {
-        [Required, EmailAddress]
-        public string Email { get; set; } = string.Empty;
-
-        [Required, MinLength(6)]
-        [DataType(DataType.Password)]
-        public string Password { get; set; } = string.Empty;
-
-        [Required]
-        [DataType(DataType.Password)]
-        [Compare(nameof(Password), ErrorMessage = "Пароли не совпадают")]
-        public string ConfirmPassword { get; set; } = string.Empty;
     }
 }
