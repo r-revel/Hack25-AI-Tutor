@@ -1,5 +1,4 @@
-﻿<!-- AiRepetitor/Components/Pages/Chat/Chat.razor -->
-@page "/"
+﻿@page "/"
 
 @using System.ComponentModel
 @using Microsoft.AspNetCore.Authorization
@@ -14,42 +13,49 @@
 <AuthorizeView>
     <Authorized>
 
-    <header class="chat-utility-bar">
-    <div class="chat-utility-left">
-        <button class="utility-tab"
-                @onclick="@(() => Nav.NavigateTo("/topics"))">
-            Темы
-        </button>
+        <!-- Верхний sticky header -->
+        <header class="chat-header-bar">
+            <div class="chat-header-left">
+                <button class="chat-action-btn" @onclick="@(() => Nav.NavigateTo("/topics"))">
+                    Темы
+                </button>
+                <button class="chat-action-btn" @onclick="@(() => Nav.NavigateTo("/test/history"))">
+                    История
+                </button>
+            </div>
 
-        <button class="utility-tab"
-                @onclick="@(() => Nav.NavigateTo("/test/history"))">
-            История
-        </button>
-    </div>
+            <div class="chat-header-right">
+                <button class="chat-action-btn" @onclick="@ResetConversationAsync">
+                    Новый чат
+                </button>
 
-    <div class="chat-utility-right">
-        <form method="post" action="/logout">
-            <button type="submit" class="utility-logout">
-                Выйти
-            </button>
-        </form>
-    </div>
-</header>
+                <form method="post" action="/logout">
+                    <button type="submit" class="chat-action-btn chat-action-btn--ghost">
+                        Выйти
+                    </button>
+                </form>
+            </div>
+        </header>
 
-
-
-
-
-        <ChatHeader OnNewChat="@ResetConversationAsync" />
-
+        <!-- Chat messages -->
         <ChatMessageList Messages="@messages" InProgressMessage="@currentResponseMessage">
             <NoMessagesContent>
                 <div>
-                    To get started, try asking about these example documents.
+                    To get started, try asking about these example documents:
+                    <div class="example-docs mt-2 flex flex-col gap-1">
+                        @foreach (var doc in exampleDocuments.Distinct())
+                        {
+                            <button class="example-doc-btn text-blue-600 hover:underline"
+                                    @onclick="() => OpenDocument(doc)">
+                                @doc
+                            </button>
+                        }
+                    </div>
                 </div>
             </NoMessagesContent>
         </ChatMessageList>
 
+        <!-- Chat input & suggestions -->
         <div class="chat-container">
             <ChatSuggestions OnSelected="@AddUserMessageAsync" @ref="@chatSuggestions" />
             <ChatInput OnSend="@AddUserMessageAsync" @ref="@chatInput" />
@@ -64,25 +70,28 @@
 </AuthorizeView>
 
 @code {
-        private const string SystemPrompt = @"
-        You are an assistant who answers questions about information you retrieve.
-        Do not answer questions about anything else.
-        Use only simple markdown to format your responses.
+    private const string SystemPrompt = @"
+You are an assistant who answers questions about information you retrieve.
+Do not answer questions about anything else.
+Use only simple markdown to format your responses.
 
-        Use the search tool to find relevant information. When you do this, end your
-        reply with citations in the special XML format:
+Use the search tool to find relevant information. When you do this, end your
+reply with citations in the special XML format:
 
-        <citation filename='string' page_number='number'>exact quote here</citation>
+<citation filename='string' page_number='number'>exact quote here</citation>
 
-        Always include the citation in your response if there are results.
-
-        The quote must be max 5 words, taken word-for-word from the search result, and is the basis for why the citation is relevant.
-        Don't refer to the presence of citations; just emit these tags right at the end, with no surrounding text.
-    ";
-
+Always include the citation in your response if there are results.
+The quote must be max 5 words, taken word-for-word from the search result, and is the basis for why the citation is relevant.
+";
 
     private readonly ChatOptions chatOptions = new();
     private readonly List<ChatMessage> messages = new();
+    private readonly List<string> exampleDocuments = new()
+    {
+        "Example_GPS_Watch.pdf",
+        "Example_Emergency_Survival_Kit.pdf"
+    };
+
     private CancellationTokenSource? currentResponseCancellation;
     private ChatMessage? currentResponseMessage;
     private ChatInput? chatInput;
@@ -91,7 +100,7 @@
     protected override void OnInitialized()
     {
         messages.Add(new(ChatRole.System, SystemPrompt));
-        chatOptions.Tools = [AIFunctionFactory.Create(SearchAsync)];
+        chatOptions.Tools = new[] { AIFunctionFactory.Create(SearchAsync) };
     }
 
     private async Task AddUserMessageAsync(ChatMessage userMessage)
@@ -135,8 +144,11 @@
             $"<result filename=\"{r.FileName}\" page_number=\"{r.PageNumber}\">{r.Text}</result>");
     }
 
-    public void Dispose()
-        => currentResponseCancellation?.Cancel();
+    private void OpenDocument(string fileName)
+    {
+        var url = $"Data/{fileName}";
+        Nav.NavigateTo(url, true); // открытие PDF в новой вкладке
+    }
+
+    public void Dispose() => currentResponseCancellation?.Cancel();
 }
-
-
