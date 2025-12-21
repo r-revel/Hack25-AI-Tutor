@@ -42,19 +42,19 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    # <<< ВАЖНО: автопул моделей при старте контейнера >>>
     entrypoint: ["/bin/sh", "-c"]
     command: >
       "
-      ollama serve &
+      ollama serve & 
       sleep 5 &&
       ollama pull gemma3:270m &&
       ollama pull nomic-embed-text &&
       wait
       "
+
   backend:
     build:
-      context: ./rest-api      # <-- путь к папке с rest-api
+      context: ./rest-api
       dockerfile: Dockerfile  
     container_name: airepetitor-backend
     ports:
@@ -62,28 +62,27 @@ services:
     depends_on:
       - ollama          
 
-
   web:
     container_name: airepetitor-web
     build:
-      context: ./AiRepetitor   # папка с Blazor Server проектом
+      context: ./AiRepetitor
       dockerfile: Dockerfile
     ports:
       - "8090:8090"
     environment:
-      # пример строки подключения к SQL внутри docker-сети
       - ConnectionStrings__Default=Server=sqlpreview,1433;Database=master;User Id=sa;Password=Im@5ldnm!;TrustServerCertificate=True;
-
-      # ВНИМАНИЕ: эти переменные должны совпадать с тем, что читает твой Program.cs
       - OLLAMA_URL=http://ollama:11434
       - MODEL_OLLAMA_CHAT=gemma3:270m
       - MODEL_OLLAMA_EMBEDDING=nomic-embed-text
       - BACKEND_URL=http://backend:8000
-
     depends_on:
       - sqlpreview
       - ollama
+      - backend
+    volumes:
+      - data_protection:/root/.aspnet/DataProtection-Keys
 
 volumes:
   db_data_mssql:
   ollama:
+  data_protection:
