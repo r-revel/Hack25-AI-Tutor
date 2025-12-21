@@ -14,27 +14,29 @@
 <AuthorizeView>
     <Authorized>
 
-      <nav class="chat-toolbar">
-    <div class="chat-toolbar__left">
-        <span class="chat-app-title">AI Repetitor</span>
-    </div>
-
-    <div class="chat-toolbar__right">
-        <button class="chat-link" @onclick="@(() => Nav.NavigateTo("/topics"))">
+    <header class="chat-utility-bar">
+    <div class="chat-utility-left">
+        <button class="utility-tab"
+                @onclick="@(() => Nav.NavigateTo("/topics"))">
             Темы
         </button>
 
-        <button class="chat-link" @onclick="@(() => Nav.NavigateTo("/test/history"))">
+        <button class="utility-tab"
+                @onclick="@(() => Nav.NavigateTo("/test/history"))">
             История
         </button>
+    </div>
 
+    <div class="chat-utility-right">
         <form method="post" action="/logout">
-            <button type="submit" class="chat-link chat-link--danger">
+            <button type="submit" class="utility-logout">
                 Выйти
             </button>
         </form>
     </div>
-</nav>
+</header>
+
+
 
 
 
