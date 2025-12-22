@@ -23,3 +23,15 @@ python build_index.py --input data\\cloud_ru_docs.jsonl --persist_dir .\\db
 ```bash
 python ui.py
 ```
+
+## Подсчет метрик
+1. Создать эмбеддинги (пропустить, если делали раньше)
+```bash
+python build_index.py --input data\\cloud_ru_docs.jsonl --persist_dir .\\db
+```
+2. Подсчет метрик (при включенной Ollama)
+   
+   Желательно использовать [torch с подходящей версией CUDA](https://pytorch.org/get-started/locally/)
+```bash
+python eval.py
+```
