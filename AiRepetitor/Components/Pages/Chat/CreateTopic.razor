@@ -1,6 +1,7 @@
 @page "/create-topic"
 @inject BackendApi BackendApi
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Создание новой темы</PageTitle>
 
@@ -46,11 +47,12 @@
             </EditForm>
         </div>
     </Authorized>
+        
+    <NotAuthorized>
+        <p>Вы не авторизованы для создания топиков.</p>
+    </NotAuthorized>
 </AuthorizeView>
 
-<NotAuthorized>
-    <p>Вы не авторизованы для создания топиков.</p>
-</NotAuthorized>
 
 @code {
     private TopicCreateDto newTopic = new TopicCreateDto("Default Name", "Default Description");
@@ -59,34 +61,44 @@
     private bool isSubmitting = false;
 
     private async Task HandleSubmit()
+{
+    isSubmitting = true;
+    errorMessage = string.Empty;
+
+    try
     {
-        isSubmitting = true;
-        errorMessage = string.Empty;
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
 
-        try
+        if (!user.Identity?.IsAuthenticated ?? true)
         {
-            var result = await BackendApi.CreateTopicAsync(newTopic);
+            errorMessage = "Пользователь не авторизован";
+            return;
+        }
 
-            if (result != null)
-            {
-                isSuccess = true;
-                await Task.Delay(1500); // Показать сообщение об успехе 1.5 секунды
-                Nav.NavigateTo("/topics");
-            }
-            else
-            {
-                errorMessage = "Не удалось создать топик. Проверьте данные и попробуйте снова.";
-            }
-        }
-        catch (Exception ex)
+        var result = await BackendApi.CreateTopicAsync(user, newTopic);
+
+        if (result != null)
         {
-            errorMessage = $"Ошибка при создании топика: {ex.Message}";
+            isSuccess = true;
+            await Task.Delay(1500);
+            Nav.NavigateTo("/topics");
         }
-        finally
+        else
         {
-            isSubmitting = false;
+            errorMessage = "Не удалось создать топик. Проверьте данные и попробуйте снова.";
         }
     }
+    catch (Exception ex)
+    {
+        errorMessage = $"Ошибка при создании топика: {ex.Message}";
+    }
+    finally
+    {
+        isSubmitting = false;
+    }
+}
+
 
     private void Cancel()
     {

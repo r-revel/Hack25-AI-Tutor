@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
 from typing import Optional, List
 
@@ -33,7 +33,7 @@ class UserResponse(UserBase):
 class TopicBase(BaseModel):
     title: str
     image: str
-    json: str
+    json_: str = Field(..., alias="json")
 
 
 class TopicCreate(TopicBase):
