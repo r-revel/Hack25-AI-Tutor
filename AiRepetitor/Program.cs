@@ -7,6 +7,7 @@ using AiRepetitor.Services.Ingestion;
 using OllamaSharp;
 using DotNetEnv;
 
+
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Components.Authorization;
 using AiRepetitor.Data;
@@ -22,8 +23,16 @@ builder.Services.AddRazorComponents()
         options.EnableDetailedErrors = true;
     });
 
-builder.Services.AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo("/root/.aspnet/DataProtection-Keys"));
+builder.Services
+    .AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo("/root/.aspnet/DataProtection-Keys"))
+    .SetApplicationName("AiRepetitor");
+
+builder.Services.AddAntiforgery(options =>
+{
+    options.SuppressXFrameOptionsHeader = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+});
 
 // .env
 Env.Load();
@@ -115,7 +124,11 @@ builder.Services.ConfigureApplicationCookie(options =>
 {
     options.LoginPath = "/login";
     options.AccessDeniedPath = "/login";
+
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 });
+
 
 // Авторизация + проброс AuthenticationState в компоненты
 builder.Services.AddAuthorization();
@@ -138,7 +151,12 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
+
 app.UseStaticFiles();
 
 app.UseAuthentication();

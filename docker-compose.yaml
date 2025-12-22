@@ -61,6 +61,8 @@ services:
       - "8000:8000"
     depends_on:
       - ollama          
+    volumes:
+      - ./Notebooks:/app/Notebooks      
 
   web:
     container_name: airepetitor-web

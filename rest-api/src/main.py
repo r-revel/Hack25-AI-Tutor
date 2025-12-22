@@ -7,6 +7,7 @@ import crud
 import lib.schemas as schemas
 from lib.install import InstallSystem
 from lib.swear_detector import RussianSwearDetector
+from lib.seed_topics import seed_topics_from_jsonl
 import auth
 import models
 from database import engine, get_db, create_db_and_tables
@@ -34,6 +35,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+def startup_event():
+    from database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        seed_topics_from_jsonl(
+            db,
+            "/app/Notebooks/cloud_ru_docs.jsonl"
+        )
+    finally:
+        db.close()
 
 
 @app.post("/register", response_model=schemas.UserResponse)

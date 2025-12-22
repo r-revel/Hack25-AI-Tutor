@@ -1,4 +1,4 @@
-<!--AiRepetitor\Components\Pages\Topics.razor!-->
+<!-- AiRepetitor\Components\Pages\Topics.razor.css -->
 @page "/topics"
 @attribute [Authorize]
 @using AiRepetitor.Services
@@ -18,23 +18,51 @@ else if (!topics.Any())
 }
 else
 {
-    <ul>
+    <div class="topics-container">
         @foreach (var t in topics)
         {
-            <li>
-                <b>@t.title</b> — @t.description
-                <button @onclick="() => StartTest(t.id)">Начать тест</button>
-            </li>
+            <div class="topic-card">
+                <h4>@t.title</h4>
+
+                <p class="topic-description">
+                    @if (!expandedTopics.Contains(t.id))
+                    {
+                        @(t.description?.Length > 150 ? t.description[..150] + "..." : t.description)
+                        @if (t.description?.Length > 150)
+                        {
+                            <span class="expand-link" @onclick="() => ToggleExpand(t.id)">Читать далее</span>
+
+                        }
+                    }
+                    else
+                    {
+                        @(t.description ?? "")
+                        <a href="#" @onclick="() => ToggleExpand(t.id)" @onclick:preventDefault>Свернуть</a>
+                    }
+                </p>
+
+                <button class="btn btn-primary" @onclick="() => StartTest(t.id)">
+                    Начать тест
+                </button>
+            </div>
         }
-    </ul>
+    </div>
 }
 
 @code {
     private List<TopicResponseDto>? topics;
+    private HashSet<int> expandedTopics = new();
 
     protected override async Task OnInitializedAsync()
     {
-        topics = (await Backend.GetTopicsAsync()).ToList();
+        try
+        {
+            topics = (await Backend.GetTopicsAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Ошибка загрузки тем: " + ex.Message);
+        }
     }
 
     private async Task StartTest(int topicId)
@@ -42,8 +70,15 @@ else
         var session = await Backend.StartTestAsync(topicId);
         if (session is not null)
         {
-            // идём на страницу прохождения теста
             Nav.NavigateTo($"/test/{session.id}");
         }
+    }
+
+    private void ToggleExpand(int topicId)
+    {
+        if (expandedTopics.Contains(topicId))
+            expandedTopics.Remove(topicId);
+        else
+            expandedTopics.Add(topicId);
     }
 }

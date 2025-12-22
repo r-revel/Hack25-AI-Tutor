@@ -26,16 +26,17 @@ class User(Base):
 
 
 class Topic(Base):
-    """Таблица доступных тем для обучения"""
     __tablename__ = "topics"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    title: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    image: Mapped[str] = mapped_column(String(100), nullable=False)
-    json: Mapped[str] = mapped_column(Text)
+    title: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+
+    description: Mapped[str] = mapped_column(Text, nullable=True)  #  добавили
+    image: Mapped[str] = mapped_column(String(200), nullable=True) #  сделали nullable
+    json: Mapped[str] = mapped_column(Text, nullable=True)
+
     is_available: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships
     questions = relationship(

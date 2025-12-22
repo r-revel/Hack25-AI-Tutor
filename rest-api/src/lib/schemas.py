@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import Optional, List
 
@@ -32,8 +32,9 @@ class UserResponse(UserBase):
 
 class TopicBase(BaseModel):
     title: str
-    image: str
-    json_: str = Field(..., alias="json")
+    description: str | None = None
+    image: str | None = None
+    json: str | None = None
 
 
 class TopicCreate(TopicBase):
@@ -47,6 +48,7 @@ class TopicResponse(TopicBase):
 
     class Config:
         from_attributes = True
+
 
 # Question schemas
 
