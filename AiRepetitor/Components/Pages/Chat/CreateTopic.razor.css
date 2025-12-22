@@ -1,0 +1,84 @@
+/* Стиль для формы создания топика */
+.create-topic-form {
+    background-color: #F9FAFB; /* Фон, похожий на стиль чата */
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin: 1rem 0;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Стили для заголовка страницы */
+.create-topic-header {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #374151;
+    margin-bottom: 1rem;
+}
+
+/* Стили для ввода данных (поле для ввода и кнопки) */
+.create-topic-input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #E5E7EB;
+    border-radius: 0.375rem;
+    background-color: #F3F4F6;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    color: #374151;
+}
+
+.create-topic-button {
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    background-color: #4152d5;
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    border: none;
+    transition: background-color 0.2s ease;
+}
+
+.create-topic-button:hover {
+    background-color: #3744b6;
+}
+
+/* Стили для кнопки "Отмена" */
+.create-topic-cancel-button {
+    background-color: #F3F4F6;
+    color: #374151;
+    border: 1px solid #E5E7EB;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 1rem;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background-color 0.2s ease;
+}
+
+.create-topic-cancel-button:hover {
+    background-color: #F9FAFB;
+}
+
+/* Стили для сообщений об ошибках и успехах */
+.alert-success,
+.alert-danger {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+}
+
+.alert-success {
+    background-color: #D1F7C4;
+    color: #27AE60;
+}
+
+.alert-danger {
+    background-color: #FDE2E2;
+    color: #E50000;
+}

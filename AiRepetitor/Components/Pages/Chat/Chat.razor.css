@@ -1,91 +1,52 @@
 /*Chat.razor.css*/
+/* Chat container (input + suggestions) */
 .chat-container {
-    position: sticky; 
-    bottom: 0; 
-    padding-left: 1.5rem;
-    padding-right: 1.5rem; 
-    padding-top: 0.75rem; 
-    padding-bottom: 1.5rem; 
-    border-top-width: 1px; 
-    background-color: #F3F4F6; 
-    border-color: #E5E7EB;
+    position: sticky;
+    bottom: 0;
+    padding: 0.75rem 1.5rem 1.5rem 1.5rem;
+    border-top: 1px solid #E5E7EB;
+    background-color: #F3F4F6;
 }
 
-
-/* Корневой контейнер чата (чтобы фон был под модальным окном) */
+/* Root chat wrapper to hold background under header */
 .chat-root {
     position: relative;
     min-height: 100vh;
     background-color: #F3F4F6;
+    padding-top: 56px; /* space for sticky header */
 }
 
-
-/* === COMMERCIAL CHAT HEADER ============================ */
-
+/* ================= COMMERCIAL CHAT HEADER =================== */
 .chat-header-bar {
     position: sticky;
     top: 0;
-    z-index: 20;
+    z-index: 30;
 
     display: flex;
     justify-content: space-between;
     align-items: center;
 
-    padding: 0.75rem 1rem;
+    height: 48px;
+    padding: 0 1rem;
+
     background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(12px);
 
-    border-bottom: 1px solid rgba(229, 231, 235, 0.8);
+    border-bottom: 1px solid rgba(229, 231, 235, 0.9);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
 }
 
-.chat-header-left {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.chat-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 9999px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: white;
-
-    background: linear-gradient(135deg, #4152d5, #6d7cff);
-}
-
-.chat-title-wrap {
-    display: flex;
-    flex-direction: column;
-}
-
-.chat-title {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: #111827;
-}
-
-.chat-subtitle {
-    font-size: 0.75rem;
-    color: #6B7280;
-}
-
-.chat-header-actions {
+.chat-header-left,
+.chat-header-right {
     display: flex;
     gap: 0.5rem;
     align-items: center;
 }
 
+/* Action buttons in header */
 .chat-action-btn {
     border: 1px solid #E5E7EB;
     background: #ffffff;
-
     padding: 0.35rem 0.7rem;
     border-radius: 9999px;
 
@@ -116,76 +77,38 @@
     color: #374151;
 }
 
-.chat-root {
-    padding-top: 56px;
+
+/* ================= CHAT SUGGESTIONS & INPUT ================= */
+.chat-suggestions,
+.chat-input {
+    width: 100%;
 }
 
-/* === CHAT UTILITY BAR (COMMERCIAL) ===================== */
-
-.chat-utility-bar {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-
+/* ================= EXAMPLE DOCUMENTS ======================= */
+.example-docs {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-
-    height: 44px;
-    padding: 0 1rem;
-
-    background: rgba(243, 244, 246, 0.85);
-    backdrop-filter: blur(10px);
-
-    border-bottom: 1px solid rgba(229, 231, 235, 0.9);
-}
-
-.chat-utility-left {
-    display: flex;
+    flex-direction: column;
     gap: 0.25rem;
 }
 
-.utility-tab {
-    background: transparent;
+.example-doc-btn {
+    background: none;
     border: none;
-
-    padding: 0.3rem 0.65rem;
-    border-radius: 6px;
-
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: #4B5563;
-
+    padding: 0;
     cursor: pointer;
-    transition: background .15s, color .15s;
+    text-align: left;
+    font-size: 0.9rem;
+    color: #1d4ed8; /* Tailwind blue-700 */
 }
 
-.utility-tab:hover {
-    background: #E5E7EB;
-    color: #111827;
+.example-doc-btn:hover {
+    text-decoration: underline;
 }
 
-.utility-tab:focus-visible {
+/* ================= ACCESSIBILITY =========================== */
+.utility-tab:focus-visible,
+.chat-action-btn:focus-visible,
+.example-doc-btn:focus-visible {
     outline: 2px solid #4152d5;
     outline-offset: 2px;
-}
-
-.chat-utility-right {
-    display: flex;
-    align-items: center;
-}
-
-.utility-logout {
-    background: transparent;
-    border: none;
-
-    font-size: 0.75rem;
-    color: #9CA3AF;
-
-    cursor: pointer;
-    padding: 0.25rem 0.5rem;
-}
-
-.utility-logout:hover {
-    color: #374151;
 }

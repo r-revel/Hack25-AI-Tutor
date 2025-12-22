@@ -11,6 +11,22 @@
     <h1 class="page-width">AiRepetitor</h1>
 </div>
 
+@using Microsoft.AspNetCore.Components.Authorization
+<CascadingAuthenticationState>
+    <AuthorizeView>
+        <Authorized>
+            <form method="post" action="/logout">
+                <button class="btn btn-link">Выйти</button>
+            </form>
+        </Authorized>
+        <NotAuthorized>
+            <a href="/login">Войти</a> |
+            <a href="/register">Регистрация</a>
+        </NotAuthorized>
+    </AuthorizeView>
+</CascadingAuthenticationState>
+
+
 @code {
     [Parameter]
     public EventCallback OnNewChat { get; set; }

@@ -1,3 +1,4 @@
+//AiRepetitor\Services\BackendDtos.cs
 namespace AiRepetitor.Services;
 
 // ---------- AUTH ----------
@@ -16,6 +17,8 @@ public sealed record TopicResponseDto(
     bool is_available,
     string json
 );
+
+
 
 // ---------- QUESTIONS / TESTS ----------
 

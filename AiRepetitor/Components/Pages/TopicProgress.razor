@@ -1,0 +1,50 @@
+@page "/topics/{TopicId:int}"
+@attribute [Authorize]
+@using AiRepetitor.Services
+@using Microsoft.AspNetCore.Authorization
+@inject BackendApi Backend
+
+<h3>Обучение по теме</h3>
+
+@if (messages is null)
+{
+    <p>Загрузка...</p>
+}
+else
+{
+    <div class="chat">
+        @foreach (var m in messages)
+        {
+            <div class="chat-msg">
+                @m.message
+            </div>
+        }
+    </div>
+
+    <input @bind="input" />
+    <button @onclick="Send">Отправить</button>
+}
+
+@code {
+    [Parameter] public int TopicId { get; set; }
+
+    List<UserProgressResponseDto>? messages;
+    string input = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        messages = (await Backend.GetTopicProgressAsync(TopicId)).ToList();
+    }
+
+    private async Task Send()
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return;
+
+        var reply = await Backend.SendTopicMessageAsync(TopicId, input);
+        if (reply != null)
+            messages!.Add(reply);
+
+        input = "";
+    }
+}

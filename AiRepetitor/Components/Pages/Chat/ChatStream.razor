@@ -1,0 +1,64 @@
+<!--AiRepetitor/Components/Pages/Chat/ChatStream.razor-->
+@page "/chat-stream"
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<h3>Chat Stream</h3>
+
+<div>
+    <textarea @bind="UserMessage" placeholder="Введите сообщение..." rows="3" style="width:100%"></textarea>
+    <button @onclick="SendMessage">Отправить</button>
+</div>
+
+<div class="chat-box" style="margin-top:10px; border:1px solid #ccc; padding:10px; height:300px; overflow:auto;">
+    @foreach (var msg in Messages)
+    {
+        <p><b>@msg.Role:</b> @msg.Content</p>
+    }
+</div>
+
+@code {
+    private List<ChatMessage> Messages { get; set; } = new();
+    private string UserMessage { get; set; } = "";
+    private IJSObjectReference? _jsModule;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _jsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/sse.js");
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(UserMessage) || _jsModule is null)
+            return;
+
+        // Добавляем сообщение пользователя
+        Messages.Add(new ChatMessage { Role = "user", Content = UserMessage });
+
+        var payload = new
+        {
+            model = "my-custom-model",
+            messages = Messages.Select(m => new { role = m.Role, content = m.Content }).ToList(),
+            stream = true
+        };
+
+        var url = $"{Http.BaseAddress}api/chat/stream";
+
+        await _jsModule.InvokeVoidAsync("startSSE", DotNetObjectReference.Create(this), url, payload);
+
+        UserMessage = "";
+    }
+
+    [JSInvokable]
+    public void ReceiveMessage(string role, string content)
+    {
+        Messages.Add(new ChatMessage { Role = role, Content = content });
+        StateHasChanged();
+    }
+
+    public record ChatMessage
+    {
+        public string Role { get; set; } = "";
+        public string Content { get; set; } = "";
+    }
+}
