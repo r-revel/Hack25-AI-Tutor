@@ -76,7 +76,8 @@
             return;
         }
 
-        var result = await BackendApi.CreateTopicAsync(user, newTopic);
+        // Исправлено: передаем только новый топик
+        var result = await BackendApi.CreateTopicAsync(newTopic);
 
         if (result != null)
         {

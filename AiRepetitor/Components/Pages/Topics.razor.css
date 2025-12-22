@@ -23,7 +23,10 @@
 }
 
 .expand-link {
-    color: blue;
+    color: #0d6efd;
     text-decoration: underline;
     cursor: pointer;
+    font-size: 0.9rem;
+    margin-left: 4px;
 }
+

@@ -1,9 +1,9 @@
-<!-- AiRepetitor\Components\Pages\Topics.razor.css -->
 @page "/topics"
 @attribute [Authorize]
 @using AiRepetitor.Services
 @using Microsoft.AspNetCore.Authorization
 @inject BackendApi Backend
+@inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Nav
 
 <h3>Темы</h3>
@@ -31,7 +31,6 @@ else
                         @if (t.description?.Length > 150)
                         {
                             <span class="expand-link" @onclick="() => ToggleExpand(t.id)">Читать далее</span>
-
                         }
                     }
                     else
@@ -65,20 +64,20 @@ else
         }
     }
 
-    private async Task StartTest(int topicId)
-    {
-        var session = await Backend.StartTestAsync(topicId);
-        if (session is not null)
-        {
-            Nav.NavigateTo($"/test/{session.id}");
-        }
-    }
-
     private void ToggleExpand(int topicId)
     {
         if (expandedTopics.Contains(topicId))
             expandedTopics.Remove(topicId);
         else
             expandedTopics.Add(topicId);
+    }
+
+    private async Task StartTest(int topicId)
+    {
+        var session = await Backend.StartTestAsync(topicId);
+        if (session != null)
+            Nav.NavigateTo($"/test/{session.id}");
+        else
+            Console.WriteLine("Не удалось начать тест");
     }
 }

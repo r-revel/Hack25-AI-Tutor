@@ -1,3 +1,4 @@
+# rest-api\src\crud.py
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -84,8 +85,13 @@ def create_user_progress(db: Session, progress: UserProgressCreate, user_id: int
 
 # TestSession CRUD
 
+def create_test_session(db: Session, topic_id: int, user_id: Optional[int] = None):
+    """
+    Создает тестовую сессию. Если user_id не указан, ставим 0.
+    """
+    if user_id is None:
+        user_id = 0  # Заглушка для неавторизованного пользователя
 
-def create_test_session(db: Session, topic_id: int, user_id: int):
     db_session = TestSession(topic_id=topic_id, user_id=user_id)
     db.add(db_session)
     db.commit()
@@ -93,10 +99,14 @@ def create_test_session(db: Session, topic_id: int, user_id: int):
     return db_session
 
 
-def get_test_session(db: Session, session_id: int, user_id: int):
-    return db.query(TestSession).filter(
-        and_(TestSession.id == session_id, TestSession.user_id == user_id)
-    ).first()
+def get_test_session(db: Session, session_id: int, user_id: Optional[int] = None):
+    """
+    Получает тестовую сессию. Если user_id не указан, ищем по session_id только.
+    """
+    query = db.query(TestSession).filter(TestSession.id == session_id)
+    if user_id is not None:
+        query = query.filter(TestSession.user_id == user_id)
+    return query.first()
 
 
 def complete_test_session(db: Session, session_id: int, score: int):

@@ -19,7 +19,7 @@ from typing import Dict, Any, AsyncGenerator
 from pydantic import BaseModel
 import asyncio
 from datetime import datetime
-# from lib.creater_question import generate_questions_from_book
+from fastapi import BackgroundTasks
 
 
 # Create database tables
@@ -171,26 +171,42 @@ def add_progress_message(
 
 
 @app.post("/topics/{topic_id}/start-test", response_model=schemas.TestSessionResponse)
-def start_test(
-    topic_id: int,
-    current_user: models.User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    # Verify topic exists
+def start_test(topic_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    from lib.creater_question import generate_questions_from_book
+
     topic = crud.get_topic(db, topic_id=topic_id)
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
 
-    # Check if topic has questions
     questions = crud.get_questions_by_topic(db, topic_id=topic_id)
-    if len(questions) < 4:
-        raise HTTPException(
-            status_code=400, detail="Topic doesn't have enough questions for a test")
+    missing = 4 - len(questions)
 
-    # Create test session
-    test_session = crud.create_test_session(
-        db, topic_id=topic_id, user_id=current_user.id)
+    def generate_missing_questions(topic_json, topic_id, missing):
+        try:
+            generated = generate_questions_from_book(missing, json.loads(topic_json))
+            for q in generated:
+                crud.create_question(db, schemas.QuestionCreate(
+                    topic_id=topic_id,
+                    question_text=q["question_text"],
+                    option_a=q["option_a"],
+                    option_b=q["option_b"],
+                    option_c=q["option_c"],
+                    option_d=q["option_d"],
+                    correct_answer=q["correct_answer"]
+                ))
+            print(f"✅ Сгенерированы {missing} вопросов для топика {topic_id}")
+        except Exception as e:
+            print(f"⚠️ Ошибка генерации вопросов для топика {topic_id}: {e}")
+
+    if missing > 0:
+        # Генерация в фоне
+        background_tasks.add_task(generate_missing_questions, topic.json, topic.id, missing)
+
+    # Создаём тестовую сессию сразу, даже если вопросов пока <4
+    test_session = crud.create_test_session(db, topic_id=topic_id, user_id=0)
     return test_session
+
+
 
 
 @app.get("/test/{session_id}/questions", response_model=List[schemas.QuestionResponse])

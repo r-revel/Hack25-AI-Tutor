@@ -65,3 +65,5 @@ public sealed record UserProgressResponseDto(
     string message,
     DateTime created_at
 );
+
+
