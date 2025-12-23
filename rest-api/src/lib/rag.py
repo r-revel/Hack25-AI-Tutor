@@ -1,117 +1,348 @@
-from langchain_community.llms import Ollama
-from langchain_community.embeddings import SentenceTransformerEmbeddings
-from langchain_community.vectorstores import Chroma
-from langchain_classic.chains import RetrievalQA
-from langchain_classic.prompts import PromptTemplate
-from langchain_core.runnables import RunnablePassthrough
-from langchain_core.output_parsers import StrOutputParser
+import os
+import re
+import json
+import chromadb
+import pandas as pd
+from typing import List, Dict, Any
+import torch
+from langchain_core.documents import Document
+from langchain_ollama import OllamaLLM
+from langchain_huggingface import HuggingFaceEmbeddings
 
-# 1. Инициализация эмбеддингов через LangChain
-embeddings = SentenceTransformerEmbeddings(
-    model_name="intfloat/multilingual-e5-small"
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+# ---------- Настройка LLM ----------
+llm = OllamaLLM(
+    model="mistral",
+    base_url="http://localhost:11434",
+    temperature=0.1,
+    top_p=0.95,
+    num_predict=512,
 )
 
-# 2. Инициализация векторной базы через LangChain
-vectorstore = Chroma(
-    collection_name="docs",
-    embedding_function=embeddings,
-    persist_directory="./chroma_db"
+# ---------- Модель эмбеддингов ----------
+# Используем ту же модель, что использовалась при создании коллекции
+embeddings = HuggingFaceEmbeddings(
+    model_name="intfloat/multilingual-e5-large",  # Размерность 1024
+    model_kwargs={'device': device},
+    encode_kwargs={'normalize_embeddings': False}
 )
 
-# 3. Инициализация LLM
-llm = Ollama(model="llama3")
+# ---------- Улучшенная очистка текста ----------
 
-# 4. Создание ретривера (гибридный поиск можно добавить позже)
-retriever = vectorstore.as_retriever(
-    search_type="similarity",
-    search_kwargs={"k": 5}
-)
 
-# 5. Создание промпта как в вашем примере
-prompt_template = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-Ты репетитор. Отвечай на русском языке, используя предоставленный контекст.
+def clean_text_for_ragas(text: str) -> str:
+    """Очистка текста для безопасного использования в JSON"""
+    if not isinstance(text, str):
+        return ""
 
+    # Удаляем все управляющие символы
+    text = re.sub(r'[\x00-\x1F\x7F-\x9F]', ' ', text)
+
+    # Удаляем непечатаемые Unicode символы
+    text = ''.join(char for char in text if char.isprintable()
+                   or char in '\n\t\r')
+
+    # Заменяем специфические пробелы
+    text = text.replace('\xa0', ' ')
+    text = text.replace('\u200b', '')
+    text = text.replace('\ufeff', '')
+
+    # Экранируем для JSON
+    text = text.replace('\\', '\\\\')
+    text = text.replace('"', "'")
+
+    # Ограничиваем длину строк
+    lines = text.split('\n')
+    cleaned_lines = []
+    for line in lines:
+        if len(line) > 1000:
+            line = line[:1000] + "..."
+        cleaned_lines.append(line)
+    text = '\n'.join(cleaned_lines)
+
+    return text.strip()
+
+# ---------- Чтение документов из Chroma ----------
+
+
+def load_and_clean_documents(limit: int = 30):
+    """Загрузка и очистка документов из ChromaDB"""
+    CHROMA_DIR = os.environ.get('CHROMA_DIR', './db')
+    client = chromadb.PersistentClient(path=CHROMA_DIR)
+    collection = client.get_collection('cloud_docs')
+
+    print("Loading documents from ChromaDB...")
+    docs_res = collection.get(
+        include=["documents", "metadatas"],
+        limit=limit
+    )
+
+    documents = []
+    for i, (text, meta) in enumerate(zip(docs_res.get("documents", []), docs_res.get("metadatas", []))):
+        cleaned_text = clean_text_for_ragas(str(text))
+
+        # Пропускаем слишком короткие документы
+        if len(cleaned_text.split()) < 10:
+            continue
+
+        # Очищаем метаданные
+        clean_meta = {}
+        if isinstance(meta, dict):
+            for key, value in meta.items():
+                if isinstance(value, str):
+                    clean_meta[key] = clean_text_for_ragas(value)
+                else:
+                    clean_meta[key] = value
+        else:
+            clean_meta = {"index": i}
+
+        documents.append(Document(
+            page_content=cleaned_text,
+            metadata=clean_meta
+        ))
+
+    print(f"Loaded and cleaned {len(documents)} documents")
+    return documents, client
+
+# ---------- Кастомный генератор вопросов ----------
+
+
+class CustomQuestionGenerator:
+    """Кастомный генератор вопросов для обхода проблем RAGAS"""
+
+    def __init__(self, llm, max_retries: int = 2):
+        self.llm = llm
+        self.max_retries = max_retries
+
+    def generate_question_from_doc(self, doc_text: str, doc_id: int = 0) -> Dict[str, Any]:
+        """Генерация одного вопроса из документа"""
+
+        # Промпт с четкими инструкциями
+        prompt = f"""На основе текста ниже создай один вопрос и ответ на него.
+
+ТЕКСТ ДОКУМЕНТА:
+{doc_text[:1500]}
+
+ИНСТРУКЦИИ:
+1. Вопрос должен проверять понимание ключевой информации из текста
+2. Ответ должен быть точным и основанным только на тексте
+3. Вопрос должен быть ясным и однозначным
+
+ФОРМАТ ВЫВОДА (строго соблюдай этот JSON формат):
+{{
+    "question": "Твой вопрос здесь",
+    "answer": "Точный ответ здесь"
+}}
+
+Сгенерируй только JSON, без дополнительного текста:"""
+
+        for attempt in range(self.max_retries):
+            try:
+                response = self.llm.invoke(prompt).strip()
+
+                # Очистка ответа
+                response = re.sub(r'```json\s*|\s*```', '', response)
+                response = re.sub(r'^.*?\{', '{', response, flags=re.DOTALL)
+                response = re.sub(r'\}.*?$', '}', response, flags=re.DOTALL)
+
+                # Парсинг JSON
+                data = json.loads(response)
+
+                # Валидация полей
+                required_fields = ["question", "answer"]
+                for field in required_fields:
+                    if field not in data:
+                        raise ValueError(f"Missing field: {field}")
+
+                # Очистка значений
+                data["question"] = clean_text_for_ragas(
+                    data["question"]).strip()
+                data["answer"] = clean_text_for_ragas(data["answer"]).strip()
+
+                return {
+                    "question": data["question"],
+                    "ground_truth": data["answer"],
+                    "context": doc_text[:1000],
+                    "success": True
+                }
+
+            except json.JSONDecodeError as e:
+                print(f"  Attempt {attempt + 1}: JSON decode error")
+                if attempt == self.max_retries - 1:
+                    return self.extract_qa_manually(response, doc_text)
+            except Exception as e:
+                print(f"  Attempt {attempt + 1}: Error - {str(e)[:50]}")
+                if attempt == self.max_retries - 1:
+                    return self.create_fallback_qa(doc_text)
+
+        return self.create_fallback_qa(doc_text)
+
+    def extract_qa_manually(self, response: str, doc_text: str) -> Dict[str, Any]:
+        """Ручное извлечение вопроса и ответа из ответа LLM"""
+        lines = [line.strip() for line in response.split('\n') if line.strip()]
+
+        question = ""
+        answer = ""
+
+        # Ищем вопрос
+        for i, line in enumerate(lines):
+            if any(keyword in line.lower() for keyword in ["вопрос", "question", "?"]):
+                question = line.replace("Вопрос:", "").replace(
+                    "Question:", "").strip()
+                # Берем следующие строки как ответ
+                if i + 1 < len(lines):
+                    answer = " ".join(lines[i+1:i+3])
+                break
+
+        if not question:
+            question = lines[0] if lines else "Что описывает этот документ?"
+
+        if not answer:
+            answer = " ".join(lines[1:3]) if len(
+                lines) > 1 else "Информация из документа"
+
+        return {
+            "question": clean_text_for_ragas(question),
+            "ground_truth": clean_text_for_ragas(answer),
+            "context": doc_text[:1000],
+            "success": False,
+            "note": "Manually extracted"
+        }
+
+    def create_fallback_qa(self, doc_text: str) -> Dict[str, Any]:
+        """Создание резервного вопроса и ответа"""
+        words = doc_text.split()[:20]
+        topic = " ".join(words)
+
+        return {
+            "question": f"Что описывается в документе о '{topic}'?",
+            "ground_truth": f"Документ содержит информацию о {topic}",
+            "context": doc_text[:1000],
+            "success": False,
+            "note": "Fallback QA"
+        }
+
+    def generate_batch(self, documents: List[Document], num_questions: int = 10) -> List[Dict[str, Any]]:
+        """Генерация батча вопросов"""
+        questions = []
+
+        print(f"Generating {num_questions} questions...")
+
+        for i in range(min(num_questions, len(documents))):
+            doc = documents[i]
+            print(
+                f"  Processing document {i+1}/{min(num_questions, len(documents))}")
+
+            result = self.generate_question_from_doc(
+                doc.page_content,
+                doc_id=i
+            )
+
+            questions.append({
+                "question": result["question"],
+                "ground_truth": result["ground_truth"],
+                "contexts": [doc.page_content[:2000]],
+                "metadata": doc.metadata,
+                "generation_success": result.get("success", False)
+            })
+
+        return questions
+
+
+# ---------- Функции для RAG оценки ----------
+def retrieve_docs_with_embeddings(question: str, collection, embeddings_model, k: int = 3) -> Dict[str, Any]:
+    """Поиск релевантных документов с использованием эмбеддингов"""
+    try:
+        # Генерируем эмбеддинг для вопроса
+        question_embedding = embeddings_model.embed_query(question)
+
+        # Используем query с эмбеддингом
+        results = collection.query(
+            query_embeddings=[question_embedding],
+            n_results=k,
+            include=["documents", "metadatas", "distances"]
+        )
+
+        return {
+            "documents": results["documents"][0] if results["documents"] else [],
+            "metadatas": results["metadatas"][0] if results["metadatas"] else [],
+            "distances": results["distances"][0] if results["distances"] else []
+        }
+    except Exception as e:
+        print(f"  Error retrieving docs: {str(e)[:100]}")
+        # Fallback: используем текстовый поиск
+        try:
+            results = collection.query(
+                query_texts=[question],
+                n_results=k,
+                include=["documents", "metadatas", "distances"]
+            )
+            return {
+                "documents": results["documents"][0] if results["documents"] else [],
+                "metadatas": results["metadatas"][0] if results["metadatas"] else [],
+                "distances": results["distances"][0] if results["distances"] else []
+            }
+        except Exception as e2:
+            print(f"  Text search also failed: {str(e2)[:100]}")
+            return {"documents": [], "metadatas": [], "distances": []}
+
+
+def answer_question(question: str, llm, context: str = "") -> Dict[str, Any]:
+    """Генерация ответа на вопрос"""
+    try:
+        if context:
+            prompt = f"""
+Ты — AI-репетитор по техническим дисциплинам. Отвечай подробно, шаг за шагом.
+Используй ТОЛЬКО информацию из блока "Контекст". Ответ должен содержать все ключевые шаги.
+Если информации недостаточно — честно скажи.
+
+---
 Контекст:
 {context}
 
-Строгие правила:
-1. Отвечай только на основе контекста
-2. Будь педагогичным и развернутым
-3. Если в контексте нет ответа - скажи об этом
-4. Форматируй ответ с примерами<|eot_id|>
+Вопрос студента:
+{question}
+"""
+        else:
+            prompt = f"""Ответь на вопрос: {question}
 
-<|start_header_id|>user<|end_header_id|>
-{question}<|eot_id|>
+Если не знаешь ответ, скажи "Не могу ответить на этот вопрос".
 
-<|start_header_id|>assistant<|end_header_id|>"""
+Ответ:"""
 
-prompt = PromptTemplate(
-    template=prompt_template,
-    input_variables=["context", "question"]
-)
-
-# 6. Создание RAG цепи через LCEL (LangChain Expression Language)
-rag_chain = (
-    {"context": retriever, "question": RunnablePassthrough()}
-    | prompt
-    | llm
-    | StrOutputParser()
-)
-
-# 7. Альтернативный вариант через RetrievalQA (более классический)
-qa_chain = RetrievalQA.from_chain_type(
-    llm=llm,
-    chain_type="stuff",
-    retriever=retriever,
-    chain_type_kwargs={
-        "prompt": prompt,
-    },
-    return_source_documents=True
-)
-
-# 8. Функция для ответа (вариант 1 - через LCEL)
-
-
-def rag_answer(query: str) -> str:
-    """Ответ на вопрос с использованием RAG"""
-    try:
-        response = rag_chain.invoke(query)
-        return response
+        response = llm.invoke(prompt)
+        return {"answer": str(response).strip(), "success": True}
     except Exception as e:
-        return f"Ошибка: {str(e)}"
-
-# 9. Функция для ответа (вариант 2 - через RetrievalQA)
+        return {"answer": f"Ошибка генерации: {str(e)[:100]}", "success": False}
 
 
-def rag_answer_with_sources(query: str):
-    """Ответ на вопрос с источниками"""
-    try:
-        result = qa_chain.invoke({"query": query})
-        return {
-            "answer": result["result"],
-            "sources": [doc.page_content for doc in result["source_documents"]]
-        }
-    except Exception as e:
-        return {"error": str(e)}
+# ---------- Основная функция для RAG-ответов ----------
+def get_rag_answer(question: str, collection, k=3) -> dict:
+    """
+    Полный цикл RAG: поиск + генерация ответа.
+    """
+    # 1. Поиск релевантных документов
+    retrieved = retrieve_docs_with_embeddings(
+        question,
+        collection,
+        embeddings,
+        k=k
+    )
 
+    # 2. Подготовка контекста
+    context = ""
+    if retrieved["documents"]:
+        context = " ".join(retrieved["documents"])
 
-# 10. Тестирование
-if __name__ == "__main__":
-    # Вариант 1
-    print("=== Вариант 1 (LCEL) ===")
-    answer = rag_answer("Что такое теорема Пифагора?")
-    print(answer)
+    # 3. Генерация ответа
+    answer_result = answer_question(question, llm, context)
 
-    print("\n=== Вариант 2 (с источниками) ===")
-    result = rag_answer_with_sources("Что такое теорема Пифагора?")
-    if "answer" in result:
-        print("Ответ:", result["answer"])
-        print("\nИсточники:")
-        for i, source in enumerate(result["sources"], 1):
-            print(f"{i}. {source[:100]}...")
-    else:
-        print("Ошибка:", result["error"])
-
-
-# Установка зависимостей
-# pip install langchain langchain-community chromadb sentence-transformers ollama
+    # 4. Формирование полного ответа
+    return {
+        "answer": answer_result["answer"],
+        "success": answer_result["success"],
+        "contexts": retrieved["documents"],
+        "sources": retrieved["metadatas"],
+        "distances": retrieved["distances"]
+    }

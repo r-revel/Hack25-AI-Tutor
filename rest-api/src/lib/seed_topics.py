@@ -116,19 +116,24 @@ def seed_topics_from_jsonl(db, path: str):
                 skipped += 1
                 continue
 
-            topic = schemas.TopicCreate(
-                title=title,
-                description=description,
-                image="default.png",
-                json=json.dumps(
-                    {
-                        **data,
-                        "clean_content": clean_content
-                    },
-                    ensure_ascii=False
-                )
-            )
+            find_topic = crud.get_topic_title(db=db, title=title)
 
+            if (find_topic == None):
+                topic = schemas.TopicCreate(
+                    title=title,
+                    description=description,
+                    image="default.png",
+                    json=json.dumps(
+                        {
+                            **data,
+                            "clean_content": clean_content
+                        },
+                        ensure_ascii=False
+                    )
+                )
+            else:
+                skipped += 1
+                
             crud.create_topic(db=db, topic=topic)
             created += 1
 

@@ -42,6 +42,10 @@ def get_topic(db: Session, topic_id: int):
     return db.query(Topic).filter(Topic.id == topic_id).first()
 
 
+def get_topic_title(db: Session, title: str):
+    return db.query(Topic).filter(Topic.title == title).first()
+
+
 def create_topic(db: Session, topic: TopicCreate):
     db_topic = Topic(**topic.dict())
     db.add(db_topic)
@@ -84,6 +88,7 @@ def create_user_progress(db: Session, progress: UserProgressCreate, user_id: int
     return db_progress
 
 # TestSession CRUD
+
 
 def create_test_session(db: Session, topic_id: int, user_id: Optional[int] = None):
     """

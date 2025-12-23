@@ -20,12 +20,16 @@ from pydantic import BaseModel
 import asyncio
 from datetime import datetime
 from fastapi import BackgroundTasks
-
+import os
+from dotenv import load_dotenv
+from lib.rag import get_rag_answer, load_and_clean_documents
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="AI Tutor API", version="1.0.0")
+
+load_dotenv()
 
 # CORS middleware
 app.add_middleware(
@@ -36,18 +40,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.on_event("startup")
 def startup_event():
     from database import SessionLocal
-
     db = SessionLocal()
     try:
         seed_topics_from_jsonl(
             db,
-            "/app/Notebooks/cloud_ru_docs.jsonl"
+            os.getenv("DATA_PATH") or "/app/Notebooks/cloud_ru_docs.jsonl",
         )
     finally:
         db.close()
+
+    app.state.documents, app.state.chroma_client = load_and_clean_documents(limit=20)
 
 
 @app.post("/register", response_model=schemas.UserResponse)
@@ -155,12 +161,20 @@ def add_progress_message(
             progress=progress,
             user_id=current_user.id
         )
+        collection = app.state.chroma_client.get_collection('cloud_docs')
+
+        rag_question = get_rag_answer(
+            question=progress.message,
+            collection=collection,
+
+        )
+
         crud.create_user_progress(
             db=db,
             progress=schemas.UserProgressCreate(
                 topic_id=topic_id,
                 is_user=False,
-                message='Системное сообщения'
+                message=rag_question['answer']
             ),
             user_id=current_user.id
         )
@@ -183,7 +197,8 @@ def start_test(topic_id: int, background_tasks: BackgroundTasks, db: Session = D
 
     def generate_missing_questions(topic_json, topic_id, missing):
         try:
-            generated = generate_questions_from_book(missing, json.loads(topic_json))
+            generated = generate_questions_from_book(
+                missing, json.loads(topic_json))
             for q in generated:
                 crud.create_question(db, schemas.QuestionCreate(
                     topic_id=topic_id,
@@ -200,13 +215,12 @@ def start_test(topic_id: int, background_tasks: BackgroundTasks, db: Session = D
 
     if missing > 0:
         # Генерация в фоне
-        background_tasks.add_task(generate_missing_questions, topic.json, topic.id, missing)
+        background_tasks.add_task(
+            generate_missing_questions, topic.json, topic.id, missing)
 
     # Создаём тестовую сессию сразу, даже если вопросов пока <4
     test_session = crud.create_test_session(db, topic_id=topic_id, user_id=0)
     return test_session
-
-
 
 
 @app.get("/test/{session_id}/questions", response_model=List[schemas.QuestionResponse])
@@ -380,227 +394,6 @@ def read_root():
 def health_check():
     return {"status": "healthy"}
 
-
-class GenerateRequest(BaseModel):
-    model: str
-    prompt: str
-    stream: bool = False
-    options: Dict[str, Any] = {}
-    system: str = ""
-    template: str = ""
-    context: list = []
-
-
-class ChatRequest(BaseModel):
-    model: str
-    messages: list
-    stream: bool = False
-    options: Dict[str, Any] = {}
-
-
-# Хранилище для разных типов контента
-RESPONSE_TEMPLATES = {
-    "default": {
-        "model": "my-custom-model",
-        "created_at": "",
-        "response": "Это стандартный ответ от модели",
-        "done": True,
-        "context": [],
-        "total_duration": 0,
-        "load_duration": 0,
-        "prompt_eval_count": 0,
-        "prompt_eval_duration": 0,
-        "eval_count": 0,
-        "eval_duration": 0
-    },
-    "creative": {
-        "model": "creative-model",
-        "created_at": "",
-        "response": "✨ Это креативный ответ с элементами творчества!",
-        "done": True
-    },
-    "technical": {
-        "model": "technical-model",
-        "created_at": "",
-        "response": "Технический ответ с точными данными и спецификациями.",
-        "done": True
-    },
-    "simple": {
-        "model": "simple-model",
-        "response": "Простой и понятный ответ.",
-        "done": True
-    }
-}
-
-# Функция для определения типа запроса
-
-
-def detect_request_type(request_data: Dict[str, Any]) -> str:
-    """
-    Определяет тип запроса на основе содержимого
-    """
-    prompt = request_data.get('prompt', '').lower()
-    messages = request_data.get('messages', [])
-
-    # Анализ промпта
-    if any(word in prompt for word in ['креатив', 'творч', 'придумай', 'воображ']):
-        return "creative"
-    elif any(word in prompt for word in ['технич', 'код', 'алгоритм', 'архитектур']):
-        return "technical"
-    elif any(word in prompt for word in ['простой', 'объясни', 'понятно']):
-        return "simple"
-
-    # Анализ сообщений в чате
-    for msg in messages:
-        if isinstance(msg, dict) and 'content' in msg:
-            content = msg['content'].lower()
-            if any(word in content for word in ['креатив', 'творч']):
-                return "creative"
-            elif any(word in content for word in ['технич', 'код']):
-                return "technical"
-
-    return "default"
-
-# Эндпоинт генерации (аналогичный Ollama /api/generate)
-
-
-@app.post("/api/generate")
-async def generate(request: GenerateRequest, http_request: Request):
-    """
-    Эндпоинт для генерации текста, совместимый с Ollama
-    """
-    request_type = detect_request_type(request.dict())
-    template = RESPONSE_TEMPLATES.get(
-        request_type, RESPONSE_TEMPLATES["default"])
-
-    # Обновляем шаблон данными из запроса
-    response_data = template.copy()
-    response_data["model"] = request.model
-    response_data["created_at"] = datetime.now().isoformat() + "Z"
-
-    if request.stream:
-        # Потоковый ответ
-        async def stream_generator():
-            full_response = response_data["response"]
-            words = full_response.split()
-
-            for i, word in enumerate(words):
-                chunk = {
-                    "model": request.model,
-                    "created_at": datetime.now().isoformat() + "Z",
-                    "response": word + " ",
-                    "done": False
-                }
-                yield json.dumps(chunk) + "\n"
-                await asyncio.sleep(0.1)  # Имитация задержки
-
-            # Финальный чанк
-            final_chunk = response_data.copy()
-            final_chunk["done"] = True
-            yield json.dumps(final_chunk) + "\n"
-
-        return EventSourceResponse(stream_generator(), media_type="application/x-ndjson")
-    else:
-        # Непотоковый ответ
-        return JSONResponse(content=response_data)
-
-# Эндпоинт чата (аналогичный Ollama /api/chat)
-
-
-@app.post("/api/chat")
-async def chat(request: ChatRequest):
-    """
-    Эндпоинт для чата, совместимый с Ollama
-    """
-    request_data = request.dict()
-    request_type = detect_request_type(request_data)
-    template = RESPONSE_TEMPLATES.get(
-        request_type, RESPONSE_TEMPLATES["default"])
-
-    response_data = {
-        "model": request.model,
-        "created_at": datetime.now().isoformat() + "Z",
-        "message": {
-            "role": "assistant",
-            "content": template["response"]
-        },
-        "done": True,
-        "total_duration": 0,
-        "load_duration": 0,
-        "prompt_eval_count": 0,
-        "eval_count": 0
-    }
-
-    if request.stream:
-        async def chat_stream_generator():
-            content = template["response"]
-            sentences = content.split('. ')
-
-            for i, sentence in enumerate(sentences):
-                if sentence:
-                    chunk = {
-                        "model": request.model,
-                        "created_at": datetime.now().isoformat() + "Z",
-                        "message": {
-                            "role": "assistant",
-                            "content": sentence + ('. ' if i < len(sentences)-1 else '.')
-                        },
-                        "done": False
-                    }
-                    yield json.dumps(chunk) + "\n"
-                    await asyncio.sleep(0.15)
-
-            final_chunk = {
-                "model": request.model,
-                "created_at": datetime.now().isoformat() + "Z",
-                "message": {
-                    "role": "assistant",
-                    "content": ""
-                },
-                "done": True
-            }
-            yield json.dumps(final_chunk) + "\n"
-
-        return EventSourceResponse(chat_stream_generator(), media_type="application/x-ndjson")
-    else:
-        return JSONResponse(content=response_data)
-
-# Эндпоинт для списка моделей (Ollama /api/tags)
-
-
-@app.get("/api/tags")
-async def list_models():
-    """
-    Возвращает список доступных моделей
-    """
-    models = {
-        "models": [
-            {
-                "name": "my-custom-model",
-                "modified_at": datetime.now().isoformat() + "Z",
-                "size": 1000000000,
-                "digest": "sha256:abc123"
-            },
-            {
-                "name": "creative-model",
-                "modified_at": datetime.now().isoformat() + "Z",
-                "size": 1200000000,
-                "digest": "sha256:def456"
-            },
-            {
-                "name": "technical-model",
-                "modified_at": datetime.now().isoformat() + "Z",
-                "size": 1500000000,
-                "digest": "sha256:ghi789"
-            }
-        ]
-    }
-    return JSONResponse(content=models)
-
-
-@app.get("/api/db")
-async def cteated_db(request: Request):
-    create_db_and_tables()
 
 if __name__ == "__main__":
     import uvicorn

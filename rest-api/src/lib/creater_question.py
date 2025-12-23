@@ -2,7 +2,7 @@
 import json
 from typing import List, Dict
 from langchain_classic.prompts import PromptTemplate
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaLLM  
 from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_core.output_parsers import StrOutputParser
@@ -11,7 +11,7 @@ import re
 from num2words import num2words
 
 # Инициализация LLM
-llm = Ollama(model="mistral")
+llm = OllamaLLM(model="mistral")
 
 def generate_questions_from_book(num_questions: int, book_json: Dict) -> List[Dict]:
     """

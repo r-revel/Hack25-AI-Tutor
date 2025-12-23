@@ -1,4 +1,4 @@
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaLLM
 import re
 from typing import List, Tuple, Dict
 import time
@@ -19,7 +19,7 @@ class RussianSwearDetector:
                          for p in self.swear_patterns]
 
         # Инициализация модели Ollama через LangChain
-        self.llm = Ollama(model=model_name)
+        self.llm = OllamaLLM(model=model_name)
 
     def regex_check(self, text: str) -> Tuple[bool, List[str]]:
         """Быстрая проверка по regex"""
@@ -58,4 +58,3 @@ class RussianSwearDetector:
             "found_words": words,
             "method": method
         }
-
