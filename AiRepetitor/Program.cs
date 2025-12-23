@@ -19,18 +19,9 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     .AddHubOptions(options => { options.EnableDetailedErrors = true; });
 
-
-var DataKey = Environment.GetEnvironmentVariable("DIR_KAY");
-
-if (string.IsNullOrEmpty(DataKey))
-{
-    DataKey = "/root/.aspnet/DataProtection-Keys";
-}
-
-
 builder.Services
     .AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo(DataKey))
+    .PersistKeysToFileSystem(new DirectoryInfo("/root/.aspnet/DataProtection-Keys"))
     .SetApplicationName("AiRepetitor");
 
 builder.Services.AddAntiforgery(options =>
