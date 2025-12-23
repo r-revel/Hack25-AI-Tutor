@@ -1,14 +1,16 @@
 @page "/create-topic"
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Authorization
+
 @inject BackendApi BackendApi
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Создание новой темы</PageTitle>
 
-@using Microsoft.AspNetCore.Components.Authorization
-
 <AuthorizeView>
-    <Authorized Context="authorizedContext">
+    <Authorized Context="authState">
         <div class="create-topic-form">
             <h3 class="create-topic-header">Создание нового топика</h3>
 
@@ -22,87 +24,113 @@
                 <div class="alert alert-success">Топик успешно создан!</div>
             }
 
-            <EditForm Model="@newTopic" OnValidSubmit="HandleSubmit">
+            <EditForm Model="@form" OnValidSubmit="HandleSubmit">
                 <DataAnnotationsValidator />
                 <ValidationSummary />
 
                 <div class="form-group">
-                    <label for="name">Название топика:</label>
-                    <InputText id="name" class="create-topic-input" @bind-Value="newTopic.Name" />
-                    <ValidationMessage For="@(() => newTopic.Name)" />
+                    <label for="title">Название топика</label>
+                    <InputText id="title"
+                               class="create-topic-input"
+                               @bind-Value="form.Title" />
+                    <ValidationMessage For="@(() => form.Title)" />
                 </div>
 
                 <div class="form-group">
-                    <label for="description">Описание:</label>
-                    <InputTextArea id="description" class="create-topic-input" @bind-Value="newTopic.Description" />
-                    <ValidationMessage For="@(() => newTopic.Description)" />
+                    <label for="description">Описание</label>
+                    <InputTextArea id="description"
+                                   class="create-topic-input"
+                                   @bind-Value="form.Description" />
                 </div>
 
                 <div class="form-group">
-                    <button type="submit" class="create-topic-button" disabled="@isSubmitting">
+                    <button type="submit"
+                            class="create-topic-button"
+                            disabled="@isSubmitting">
                         @(isSubmitting ? "Создание..." : "Создать топик")
                     </button>
-                    <button type="button" class="create-topic-cancel-button" @onclick="Cancel">Отмена</button>
+
+                    <button type="button"
+                            class="create-topic-cancel-button"
+                            disabled="@isSubmitting"
+                            @onclick="Cancel">
+                        Отмена
+                    </button>
                 </div>
             </EditForm>
         </div>
     </Authorized>
-        
+
     <NotAuthorized>
         <p>Вы не авторизованы для создания топиков.</p>
     </NotAuthorized>
 </AuthorizeView>
 
-
 @code {
-    private TopicCreateDto newTopic = new TopicCreateDto("Default Name", "Default Description");
+    private CreateTopicForm form = new();
     private string errorMessage = string.Empty;
-    private bool isSuccess = false;
     private bool isSubmitting = false;
+    private bool isSuccess = false;
 
     private async Task HandleSubmit()
-{
-    isSubmitting = true;
-    errorMessage = string.Empty;
-
-    try
     {
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
+        isSubmitting = true;
+        errorMessage = string.Empty;
+        isSuccess = false;
 
-        if (!user.Identity?.IsAuthenticated ?? true)
+        try
         {
-            errorMessage = "Пользователь не авторизован";
-            return;
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user.Identity?.IsAuthenticated != true)
+            {
+                errorMessage = "Пользователь не авторизован";
+                return;
+            }
+
+            // DTO под FastAPI
+            var dto = new TopicCreateDto(
+                title: form.Title.Trim(),
+                description: string.IsNullOrWhiteSpace(form.Description)
+                    ? null
+                    : form.Description.Trim(),
+                image: null,
+                json: null
+            );
+
+            var result = await BackendApi.CreateTopicAsync(dto, user);
+
+            if (result is not null)
+            {
+                isSuccess = true;
+                Nav.NavigateTo("/topics");
+            }
+            else
+            {
+                errorMessage =
+                    "Не удалось создать топик. Смотри docker logs airepetitor-web (там будет тело ответа FastAPI).";
+            }
         }
-
-        // Исправлено: передаем только новый топик
-        var result = await BackendApi.CreateTopicAsync(newTopic);
-
-        if (result != null)
+        catch (Exception ex)
         {
-            isSuccess = true;
-            await Task.Delay(1500);
-            Nav.NavigateTo("/topics");
+            errorMessage = $"Ошибка при создании топика: {ex.Message}";
         }
-        else
+        finally
         {
-            errorMessage = "Не удалось создать топик. Проверьте данные и попробуйте снова.";
+            isSubmitting = false;
         }
     }
-    catch (Exception ex)
-    {
-        errorMessage = $"Ошибка при создании топика: {ex.Message}";
-    }
-    finally
-    {
-        isSubmitting = false;
-    }
-}
-
 
     private void Cancel()
+        => Nav.NavigateTo("/topics");
+
+    private sealed class CreateTopicForm
     {
-        Nav.NavigateTo("/topics");
+        [Required(ErrorMessage = "Введите название")]
+        [MinLength(2, ErrorMessage = "Название слишком короткое")]
+        public string Title { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
     }
 }

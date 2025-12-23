@@ -6,6 +6,8 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Nav
 
+
+
 <h3>Темы</h3>
 
 @if (topics is null)
@@ -72,12 +74,16 @@ else
             expandedTopics.Add(topicId);
     }
 
-    private async Task StartTest(int topicId)
-    {
-        var session = await Backend.StartTestAsync(topicId);
-        if (session != null)
-            Nav.NavigateTo($"/test/{session.id}");
-        else
-            Console.WriteLine("Не удалось начать тест");
-    }
+private async Task StartTest(int topicId)
+{
+    var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+    var user = auth.User;
+
+    var session = await Backend.StartTestAsync(topicId, user);
+    if (session != null)
+        Nav.NavigateTo($"/test/{session.id}");
+    else
+        Console.WriteLine("Не удалось начать тест");
+}
+
 }

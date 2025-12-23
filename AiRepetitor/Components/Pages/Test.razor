@@ -1,10 +1,13 @@
-<!--AiRepetitor\Components\Pages\Test.razor!-->
 @page "/test/{SessionId:int}"
 @attribute [Authorize]
+
 @using AiRepetitor.Services
 @using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+
 @inject BackendApi Backend
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
 
 <h3>Тест</h3>
 
@@ -21,8 +24,8 @@ else if (isSubmitted && result is not null)
     <h4>Результат</h4>
     <p>@result.correct_answers из @result.total_questions (@result.percentage.ToString("F0")%)</p>
 
-    <button @onclick="@GoToTopics">К темам</button>
-    <button @onclick="@GoToHistory">К истории тестов</button>
+    <button @onclick="GoToTopics">К темам</button>
+    <button @onclick="GoToHistory">К истории тестов</button>
 }
 else if (questions is null || !questions.Any())
 {
@@ -30,7 +33,7 @@ else if (questions is null || !questions.Any())
 }
 else
 {
-    <EditForm OnValidSubmit="@SubmitTest">
+    <EditForm OnValidSubmit="SubmitTest">
         @foreach (var q in questions)
         {
             <div class="test-question">
@@ -55,8 +58,7 @@ else
 }
 
 @code {
-    [Parameter]
-    public int SessionId { get; set; }
+    [Parameter] public int SessionId { get; set; }
 
     private bool isLoading = true;
     private bool isSubmitted = false;
@@ -66,11 +68,23 @@ else
     private readonly Dictionary<int, string> _answers = new();
     private TestResultResponseDto? result;
 
+    private ClaimsPrincipal? _user;
+
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            questions = (await Backend.GetTestQuestionsAsync(SessionId)).ToList();
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            _user = auth.User;
+
+            if (_user?.Identity?.IsAuthenticated != true)
+            {
+                errorMessage = "Пользователь не авторизован.";
+                return;
+            }
+
+            // методы BackendApi требуют ClaimsPrincipal (не null)
+            questions = (await Backend.GetTestQuestionsAsync(SessionId, _user!)).ToList();
         }
         catch (Exception ex)
         {
@@ -84,7 +98,6 @@ else
 
     private IEnumerable<KeyValuePair<string, string>> GetOptions(QuestionResponseDto q)
     {
-        // соответствие: A/B/C/D
         yield return new("A", q.option_a);
         yield return new("B", q.option_b);
         yield return new("C", q.option_c);
@@ -92,33 +105,33 @@ else
     }
 
     private void SelectAnswer(int questionId, string optionKey)
-    {
-        _answers[questionId] = optionKey;
-    }
+        => _answers[questionId] = optionKey;
 
     private bool IsSelected(int questionId, string optionKey)
-    {
-        return _answers.TryGetValue(questionId, out var val) && val == optionKey;
-    }
+        => _answers.TryGetValue(questionId, out var val) && val == optionKey;
 
     private async Task SubmitTest()
     {
         if (questions is null || !questions.Any())
             return;
 
-        var answers = questions
-            .Select(q =>
-            {
-                _answers.TryGetValue(q.id, out var ans);
-                return new TestAnswerSubmitDto(q.id, ans ?? "");
-            })
-            .ToList();
+        if (_user?.Identity?.IsAuthenticated != true)
+        {
+            errorMessage = "Пользователь не авторизован.";
+            return;
+        }
+
+        var answers = questions.Select(q =>
+        {
+            _answers.TryGetValue(q.id, out var ans);
+            return new TestAnswerSubmitDto(q.id, ans ?? "");
+        }).ToList();
 
         var submitDto = new TestSubmitDto(answers);
 
         try
         {
-            result = await Backend.SubmitTestAsync(SessionId, submitDto);
+            result = await Backend.SubmitTestAsync(SessionId, submitDto, _user!);
             if (result is null)
             {
                 errorMessage = "Ошибка при отправке теста.";

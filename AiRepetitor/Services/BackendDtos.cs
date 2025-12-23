@@ -1,15 +1,12 @@
 //AiRepetitor\Services\BackendDtos.cs
+using System.Text.Json.Serialization;
+
 namespace AiRepetitor.Services;
 
 // ---------- AUTH ----------
-
-public sealed record TokenDto(
-    string access_token,
-    string token_type
-);
+public sealed record TokenDto(string access_token, string token_type);
 
 // ---------- TOPICS ----------
-
 public sealed record TopicResponseDto(
     int id,
     string title,
@@ -18,10 +15,15 @@ public sealed record TopicResponseDto(
     string json
 );
 
-
+// ✅ ДОБАВЬ ЭТО
+public sealed record TopicCreateDto(
+    [property: JsonPropertyName("title")] string title,
+    [property: JsonPropertyName("description")] string? description = null,
+    [property: JsonPropertyName("image")] string? image = null,
+    [property: JsonPropertyName("json")] string? json = null
+);
 
 // ---------- QUESTIONS / TESTS ----------
-
 public sealed record QuestionResponseDto(
     int id,
     string question_text,
@@ -40,14 +42,8 @@ public sealed record TestSessionResponseDto(
     int? total_score
 );
 
-public sealed record TestAnswerSubmitDto(
-    int question_id,
-    string user_answer
-);
-
-public sealed record TestSubmitDto(
-    List<TestAnswerSubmitDto> answers
-);
+public sealed record TestAnswerSubmitDto(int question_id, string user_answer);
+public sealed record TestSubmitDto(List<TestAnswerSubmitDto> answers);
 
 public sealed record TestResultResponseDto(
     TestSessionResponseDto session,
@@ -57,7 +53,6 @@ public sealed record TestResultResponseDto(
 );
 
 // ---------- PROGRESS ----------
-
 public sealed record UserProgressResponseDto(
     int id,
     int user_id,
@@ -65,5 +60,3 @@ public sealed record UserProgressResponseDto(
     string message,
     DateTime created_at
 );
-
-

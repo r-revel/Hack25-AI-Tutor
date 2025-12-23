@@ -17,39 +17,28 @@
 
         @if (!string.IsNullOrEmpty(errorMessage))
         {
-            <div class="auth-alert">
-                @errorMessage
-            </div>
+            <div class="auth-alert">@errorMessage</div>
         }
 
         <form method="post" action="/auth/register">
             <div class="auth-field">
-                <label class="auth-label" for="email">E-mail</label>
-                <input id="email"
-                       name="Email"
-                       type="email"
-                       class="auth-input"
-                       required />
+                <label class="auth-label">Username</label>
+                <input name="Username" class="auth-input" required />
             </div>
 
             <div class="auth-field">
-                <label class="auth-label" for="password">Пароль</label>
-                <input id="password"
-                       name="Password"
-                       type="password"
-                       class="auth-input"
-                       required
-                       minlength="6" />
+                <label class="auth-label">E-mail</label>
+                <input name="Email" type="email" class="auth-input" required />
             </div>
 
             <div class="auth-field">
-                <label class="auth-label" for="confirmPassword">Повтор пароля</label>
-                <input id="confirmPassword"
-                       name="ConfirmPassword"
-                       type="password"
-                       class="auth-input"
-                       required
-                       minlength="6" />
+                <label class="auth-label">Пароль</label>
+                <input name="Password" type="password" class="auth-input" required minlength="4" />
+            </div>
+
+            <div class="auth-field">
+                <label class="auth-label">Повтор пароля</label>
+                <input name="ConfirmPassword" type="password" class="auth-input" required minlength="4" />
             </div>
 
             <button type="submit" class="auth-button-primary">
@@ -74,9 +63,14 @@
             {
                 "empty"    => "Заполните все поля.",
                 "nomatch"  => "Пароли не совпадают.",
-                "identity" => "Не удалось создать пользователя. Попробуйте ещё раз.",
+                "backend"  => "Не удалось создать пользователя в API.",
+                "identity" => "Не удалось создать пользователя.",
                 _          => "Не удалось зарегистрироваться. Попробуйте ещё раз."
             };
+        }
+        if (query.TryGetValue("msg", out var m))
+        {
+            errorMessage = Uri.UnescapeDataString(m.ToString());
         }
     }
 }
