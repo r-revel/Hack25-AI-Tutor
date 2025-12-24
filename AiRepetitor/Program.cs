@@ -1,40 +1,27 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
 using AiRepetitor.Components;
+using AiRepetitor.Data;
 using AiRepetitor.Services;
 using AiRepetitor.Services.Ingestion;
-using OllamaSharp;
-using DotNetEnv;
-
-
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Components.Authorization;
-using AiRepetitor.Data;
-using Microsoft.AspNetCore.DataProtection;
 using Blazored.LocalStorage;
+using DotNetEnv;
+using OllamaSharp;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
-    .AddHubOptions(options =>
-    {
-        options.EnableDetailedErrors = true;
-    });
-
-
-var DataKey = Environment.GetEnvironmentVariable("DIR_KAY");
-
-if (string.IsNullOrEmpty(DataKey))
-{
-    DataKey = "/root/.aspnet/DataProtection-Keys";
-}
-
+    .AddHubOptions(options => { options.EnableDetailedErrors = true; });
 
 builder.Services
     .AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo(DataKey))
+    .PersistKeysToFileSystem(new DirectoryInfo("/root/.aspnet/DataProtection-Keys"))
     .SetApplicationName("AiRepetitor");
 
 builder.Services.AddAntiforgery(options =>
@@ -48,18 +35,12 @@ Env.Load();
 
 // ==== читаем конфиги из env ====
 var backendBaseUrl = Environment.GetEnvironmentVariable("BACKEND_URL");
-var ollamaBaseUrl  = Environment.GetEnvironmentVariable("OLLAMA_URL");
+var ollamaBaseUrl = Environment.GetEnvironmentVariable("OLLAMA_URL");
 
-// поддерживаем и старые, и новые имена переменных
-var chatModel  = Environment.GetEnvironmentVariable("MODEL_OLLAMA_CHAT")
-                 ?? Environment.GetEnvironmentVariable("CHAT_MODEL");
+var chatModel = Environment.GetEnvironmentVariable("MODEL_OLLAMA_CHAT")
+               ?? Environment.GetEnvironmentVariable("CHAT_MODEL");
 var embedModel = Environment.GetEnvironmentVariable("MODEL_OLLAMA_EMBEDDING")
-                 ?? Environment.GetEnvironmentVariable("EMBED_MODEL");
-
-Console.WriteLine($"BACKEND_URL={backendBaseUrl}");
-Console.WriteLine($"OLLAMA_URL={ollamaBaseUrl}");
-Console.WriteLine($"CHAT_MODEL={chatModel}");
-Console.WriteLine($"EMBED_MODEL={embedModel}");
+               ?? Environment.GetEnvironmentVariable("EMBED_MODEL");
 
 // ==== проверки ====
 if (string.IsNullOrWhiteSpace(backendBaseUrl))
@@ -76,7 +57,7 @@ var ollamaUri = new Uri(ollamaBaseUrl);
 
 IChatClient chatClient = new OllamaApiClient(ollamaUri, chatModel);
 IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator =
-        new OllamaApiClient(ollamaUri, embedModel);
+    new OllamaApiClient(ollamaUri, embedModel);
 
 builder.Services.AddSingleton(chatClient);
 builder.Services.AddSingleton(embeddingGenerator);
@@ -85,8 +66,15 @@ builder.Services.AddSingleton(embeddingGenerator);
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient("Backend", client =>
 {
-    client.BaseAddress = new Uri(backendBaseUrl!);
+    client.BaseAddress = new Uri(backendBaseUrl);
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    UseCookies = true,
+    CookieContainer = new System.Net.CookieContainer()
 });
+
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<BackendApi>();
 
 // ==== Векторное хранилище ====
@@ -97,37 +85,28 @@ builder.Services.AddScoped<DataIngestor>();
 builder.Services.AddSingleton<SemanticSearch>();
 builder.Services.AddBlazoredLocalStorage();
 
-
 // ==== кеш загрузок ====
 builder.Services.AddDbContext<IngestionCacheDbContext>(options =>
     options.UseSqlite("Data Source=ingestioncache.db"));
 
 // ==== Auth (Identity) ====
+// Важно: AddIdentity (не AddIdentityCore) -> чтобы был token store (AspNetUserTokens)
 builder.Services.AddDbContext<AuthDbContext>(options =>
     options.UseSqlite("Data Source=auth.db"));
 
 builder.Services
-    .AddIdentityCore<IdentityUser>(options =>
+    .AddIdentity<IdentityUser, IdentityRole>(options =>
     {
         options.Password.RequireDigit = false;
         options.Password.RequireLowercase = false;
         options.Password.RequireNonAlphanumeric = false;
         options.Password.RequireUppercase = false;
-        options.Password.RequiredLength = 6;
+        options.Password.RequiredLength = 4;
 
         options.SignIn.RequireConfirmedAccount = false;
     })
     .AddEntityFrameworkStores<AuthDbContext>()
-    .AddSignInManager();
-
-// Cookie-аутентификация
-builder.Services
-    .AddAuthentication(options =>
-    {
-        options.DefaultScheme = IdentityConstants.ApplicationScheme;
-        options.DefaultSignInScheme = IdentityConstants.ApplicationScheme;
-    })
-    .AddIdentityCookies();
+    .AddDefaultTokenProviders();
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
@@ -138,8 +117,6 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 });
 
-
-// Авторизация + проброс AuthenticationState в компоненты
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 
@@ -151,6 +128,38 @@ using (var scope = app.Services.CreateScope())
 {
     var authDb = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
     authDb.Database.EnsureCreated();
+
+    // Seed Identity user (ruslan)
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+
+    var seedUsername = Environment.GetEnvironmentVariable("SEED_USER_USERNAME") ?? "ruslan";
+    var seedEmail = Environment.GetEnvironmentVariable("SEED_USER_EMAIL") ?? "ruslan@example.com";
+    var seedPassword = Environment.GetEnvironmentVariable("SEED_USER_PASSWORD") ?? "1234";
+
+    var existing = await userManager.FindByNameAsync(seedUsername);
+    if (existing == null)
+    {
+        var u = new IdentityUser
+        {
+            UserName = seedUsername,
+            Email = seedEmail
+        };
+
+        var res = await userManager.CreateAsync(u, seedPassword);
+        if (!res.Succeeded)
+        {
+            app.Logger.LogError("Failed to seed Identity user: {Errors}",
+                string.Join("; ", res.Errors.Select(e => e.Description)));
+        }
+        else
+        {
+            app.Logger.LogInformation("✅ Seed Identity user created: {User}", seedUsername);
+        }
+    }
+    else
+    {
+        app.Logger.LogInformation("ℹ️ Seed Identity user already exists: {User}", seedUsername);
+    }
 }
 
 // ==== PIPELINE ====
@@ -158,13 +167,8 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
-}
-
-if (!app.Environment.IsDevelopment())
-{
     app.UseHttpsRedirection();
 }
-
 
 app.UseStaticFiles();
 
@@ -174,58 +178,79 @@ app.UseAuthorization();
 // Для интерактивных Razor Components/форм
 app.UseAntiforgery();
 
-// === endpoints авторизации (минимальные API) ===
-
+// =============================
 // POST /auth/login
+// =============================
 app.MapPost("/auth/login", async (
     HttpContext httpContext,
-    SignInManager<IdentityUser> signInManager) =>
+    UserManager<IdentityUser> userManager,
+    SignInManager<IdentityUser> signInManager,
+    BackendApi backendApi) =>
 {
     var form = await httpContext.Request.ReadFormAsync();
 
-    var email      = form["Email"].ToString();
-    var password   = form["Password"].ToString();
+    var username = form["Username"].ToString();
+    var password = form["Password"].ToString();
     var rememberMe = !string.IsNullOrEmpty(form["RememberMe"]);
-    var returnUrl  = form["ReturnUrl"].ToString();
+    var returnUrl = form["ReturnUrl"].ToString();
 
-    if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
-    {
+    if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
         return Results.Redirect("/login?error=empty");
-    }
 
-    var result = await signInManager.PasswordSignInAsync(
-        email,
-        password,
-        rememberMe,
-        lockoutOnFailure: false);
+    // 1) ищем Identity по username
+    var user = await userManager.FindByNameAsync(username);
+    if (user is null)
+        return Results.Redirect("/login?error=invalid");
 
-    if (result.Succeeded)
+    var okPassword = await userManager.CheckPasswordAsync(user, password);
+    if (!okPassword)
+        return Results.Redirect("/login?error=invalid");
+
+    // 2) логинимся в FastAPI по username/password
+    var token = await backendApi.LoginAsync(username, password);
+    if (token?.access_token is null)
     {
-        // простая и безопасная обработка returnUrl
-        if (!string.IsNullOrWhiteSpace(returnUrl) && returnUrl.StartsWith("/"))
-            return Results.Redirect(returnUrl);
-
-        return Results.Redirect("/");
+        app.Logger.LogWarning("FastAPI login failed for {Username}", username);
+        return Results.Redirect("/login?error=backend");
     }
 
-    return Results.Redirect("/login?error=invalid");
+    // 3) логинимся в Identity (cookie)
+    await signInManager.SignInAsync(user, rememberMe);
+
+    // 4) сохраняем JWT в Identity token store (AspNetUserTokens)
+    await userManager.SetAuthenticationTokenAsync(
+        user,
+        loginProvider: "FastApi",
+        tokenName: "access_token",
+        tokenValue: token.access_token);
+
+    app.Logger.LogInformation("✅ Stored FastAPI JWT for {User}. jwtLen={Len}", username, token.access_token.Length);
+
+    if (!string.IsNullOrWhiteSpace(returnUrl) && returnUrl.StartsWith("/"))
+        return Results.Redirect(returnUrl);
+
+    return Results.Redirect("/");
 })
 .DisableAntiforgery();
 
-
-// POST /auth/register (можешь оставить на будущее или удалить, если не нужен)
+// =============================
+// POST /auth/register
+// =============================
 app.MapPost("/auth/register", async (
     HttpContext httpContext,
     UserManager<IdentityUser> userManager,
-    SignInManager<IdentityUser> signInManager) =>
+    SignInManager<IdentityUser> signInManager,
+    BackendApi backendApi) =>
 {
     var form = await httpContext.Request.ReadFormAsync();
 
-    var email           = form["Email"].ToString();
-    var password        = form["Password"].ToString();
+    var username = form["Username"].ToString();
+    var email = form["Email"].ToString();
+    var password = form["Password"].ToString();
     var confirmPassword = form["ConfirmPassword"].ToString();
 
-    if (string.IsNullOrWhiteSpace(email) ||
+    if (string.IsNullOrWhiteSpace(username) ||
+        string.IsNullOrWhiteSpace(email) ||
         string.IsNullOrWhiteSpace(password) ||
         string.IsNullOrWhiteSpace(confirmPassword))
     {
@@ -233,29 +258,37 @@ app.MapPost("/auth/register", async (
     }
 
     if (!string.Equals(password, confirmPassword, StringComparison.Ordinal))
-    {
         return Results.Redirect("/register?error=nomatch");
-    }
 
+    // 1) регистрируем в FastAPI
+    var okBackend = await backendApi.RegisterAsync(username, email, password);
+    if (!okBackend)
+        return Results.Redirect("/register?error=backend");
+
+    // 2) регистрируем в Identity
     var user = new IdentityUser
     {
-        UserName = email,
+        UserName = username,
         Email = email
     };
 
     var createResult = await userManager.CreateAsync(user, password);
-
     if (!createResult.Succeeded)
     {
-        return Results.Redirect("/register?error=identity");
+        var msg = string.Join(" | ", createResult.Errors.Select(e => e.Description));
+        app.Logger.LogWarning("Identity register failed for {User}. Errors: {Errors}", username, msg);
+
+        var encoded = Uri.EscapeDataString(msg);
+        return Results.Redirect($"/register?error=identity&msg={encoded}");
     }
 
+    // ✅ вот этого у тебя не хватает
     await signInManager.SignInAsync(user, isPersistent: false);
     return Results.Redirect("/");
 })
 .DisableAntiforgery();
 
-// Razor Components (чат и прочее)
+// Razor Components
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
@@ -274,7 +307,7 @@ catch (Exception ex)
     app.Logger.LogError(ex, "Failed to ingest PDF data at startup");
 }
 
-// ==== debug endpoint ====
+// ==== debug endpoints ====
 app.MapGet("/debug/where", () => new
 {
     env = app.Environment.EnvironmentName,
@@ -284,11 +317,19 @@ app.MapGet("/debug/where", () => new
     embedModel
 });
 
+app.MapGet("/debug/whoami", (HttpContext ctx) =>
+{
+    var u = ctx.User;
+    return Results.Json(new
+    {
+        isAuth = u?.Identity?.IsAuthenticated ?? false,
+        name = u?.Identity?.Name,
+        claims = u?.Claims.Select(c => new { c.Type, c.Value }).ToList()
+    });
+});
 
 // logout
-app.MapPost("/logout", async (
-    SignInManager<IdentityUser> signInManager,
-    HttpContext httpContext) =>
+app.MapPost("/logout", async (SignInManager<IdentityUser> signInManager) =>
 {
     await signInManager.SignOutAsync();
     return Results.Redirect("/login");

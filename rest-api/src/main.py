@@ -1,3 +1,4 @@
+from database import SessionLocal
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -19,6 +20,8 @@ from typing import Dict, Any, AsyncGenerator
 from pydantic import BaseModel
 import asyncio
 from datetime import datetime
+import os
+
 from fastapi import BackgroundTasks
 import os
 from dotenv import load_dotenv
@@ -43,17 +46,31 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup_event():
-    from database import SessionLocal
     db = SessionLocal()
     try:
-        seed_topics_from_jsonl(
-            db,
-            os.getenv("DATA_PATH") or "/app/Notebooks/cloud_ru_docs.jsonl",
-        )
+        # seed topics
+        os.getenv("DATA_PATH") or "/app/Notebooks/cloud_ru_docs.jsonl",
+
+        # seed user
+        username = os.getenv("SEED_USER_USERNAME", "ruslan")
+        email = os.getenv("SEED_USER_EMAIL", "ruslan@example.com")
+        password = os.getenv("SEED_USER_PASSWORD", "1234")
+
+        existing = crud.get_user_by_username(db, username=username)
+        if not existing:
+            crud.create_user(db=db, user=schemas.UserCreate(
+                username=username,
+                email=email,
+                password=password
+            ))
+            print(f"✅ Seed user created: {username}")
+        else:
+            print(f"ℹ️ Seed user already exists: {username}")
     finally:
         db.close()
 
-    app.state.documents, app.state.chroma_client = load_and_clean_documents(limit=20)
+    app.state.documents, app.state.chroma_client = load_and_clean_documents(
+        limit=20)
 
 
 @app.post("/register", response_model=schemas.UserResponse)
@@ -185,7 +202,12 @@ def add_progress_message(
 
 
 @app.post("/topics/{topic_id}/start-test", response_model=schemas.TestSessionResponse)
-def start_test(topic_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def start_test(
+    topic_id: int,
+    background_tasks: BackgroundTasks,
+    current_user: models.User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
     from lib.creater_question import generate_questions_from_book
 
     topic = crud.get_topic(db, topic_id=topic_id)
@@ -216,10 +238,13 @@ def start_test(topic_id: int, background_tasks: BackgroundTasks, db: Session = D
     if missing > 0:
         # Генерация в фоне
         background_tasks.add_task(
-            generate_missing_questions, topic.json, topic.id, missing)
+            generate_missing_questions, topic.json, topic.id, missing
+        )
 
-    # Создаём тестовую сессию сразу, даже если вопросов пока <4
-    test_session = crud.create_test_session(db, topic_id=topic_id, user_id=0)
+    test_session = crud.create_test_session(
+        db, topic_id=topic_id, user_id=current_user.id)
+    print("START_TEST: created session", test_session.id, "user_id=",
+          test_session.user_id, "topic_id=", test_session.topic_id)
     return test_session
 
 
@@ -241,6 +266,8 @@ def get_test_questions(
     # Get 4 random questions for the topic
     questions = crud.get_questions_by_topic(
         db, topic_id=test_session.topic_id, limit=4)
+    print("GET_QUESTIONS:", "session_id=", session_id,
+          "current_user.id=", current_user.id)
     return questions
 
 

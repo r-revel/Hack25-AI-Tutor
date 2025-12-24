@@ -1,6 +1,7 @@
 ﻿using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -10,198 +11,266 @@ public sealed class BackendApi
 {
     private readonly HttpClient _http;
     private readonly ILogger<BackendApi> _logger;
-    private string? _token;   // JWT от FastAPI
+    private readonly UserManager<IdentityUser> _userManager;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    private const string ServiceUser = "service@airepetitor.ru";
-    private const string ServicePassword = "super-secret";
+    private const string FastApiLoginProvider = "FastApi";
+    private const string FastApiTokenName = "access_token";
 
-    public BackendApi(IHttpClientFactory f, ILogger<BackendApi> logger)
+    public BackendApi(
+        IHttpClientFactory f,
+        ILogger<BackendApi> logger,
+        UserManager<IdentityUser> userManager,
+        IHttpContextAccessor httpContextAccessor)
     {
         _http = f.CreateClient("Backend");
         _logger = logger;
-
-        // по умолчанию JWT сервисного пользователя (для админских действий)
-        SetToken("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzZXJ2aWNlQGFpcmVwZXRpdG9yLnJ1IiwiZXhwIjoxNzY2Mzk2MTcwfQ.BD8gN8Ce_zhBB4Kt1rzxyf0k1Vq1i1ZwZYHvig8a9V8");
+        _userManager = userManager;
+        _httpContextAccessor = httpContextAccessor;
     }
 
-    // =================== AUTH (FastAPI /login) ===================
-public async Task<bool> LoginAsync(string username, string password, CancellationToken ct = default)
+    // ===== AUTH (FastAPI /login) =====
+    public async Task<TokenDto?> LoginAsync(string username, string password, CancellationToken ct = default)
+    {
+        var payload = new { username, password };
+        var resp = await _http.PostAsJsonAsync("/login", payload, ct);
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            _logger.LogWarning("Backend login failed: {Status}. Body: {Body}", resp.StatusCode, body);
+            return null;
+        }
+
+        var token = await resp.Content.ReadFromJsonAsync<TokenDto>(cancellationToken: ct);
+        if (token?.access_token is null)
+        {
+            _logger.LogWarning("Backend login: no access_token");
+            return null;
+        }
+
+        return token;
+    }
+
+    // ===== helpers =====
+    private void SetBearer(string jwt)
+    {
+        _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+    }
+
+    private static InvalidOperationException NoJwt() =>
+        new("No FastAPI JWT found for current user. User is not logged into FastAPI backend.");
+
+    /// <summary>
+    /// Пытаемся достать JWT сначала из claims (если оставишь), потом из Identity token store.
+    /// Работает даже если claim backend_jwt отсутствует/не сериализовался в cookie.
+    /// </summary>
+    private async Task<bool> TryUseUserJwtAsync(ClaimsPrincipal? principal, CancellationToken ct = default)
 {
-    var payload = new { username, password };
-    var resp = await _http.PostAsJsonAsync("/login", payload, ct);
-
-    if (!resp.IsSuccessStatusCode)
+    var fromClaim = principal?.FindFirst("backend_jwt")?.Value;
+    if (!string.IsNullOrWhiteSpace(fromClaim))
     {
-        _logger.LogWarning("Backend login failed: {Status}", resp.StatusCode);
-        return false;
+        _logger.LogInformation("JWT found in claim backend_jwt. len={Len}", fromClaim.Length);
+        SetBearer(fromClaim);
+        return true;
     }
 
-    var token = await resp.Content.ReadFromJsonAsync<TokenDto>(cancellationToken: ct);
-    if (token?.access_token is null)
-    {
-        _logger.LogWarning("Backend login: no token");
+    principal ??= _httpContextAccessor.HttpContext?.User;
+
+    _logger.LogInformation("TryUseUserJwt: isAuth={Auth} name={Name}",
+        principal?.Identity?.IsAuthenticated == true,
+        principal?.Identity?.Name ?? "(null)");
+
+    if (principal?.Identity?.IsAuthenticated != true)
         return false;
-    }
 
-    // Сохраняем JWT пользователя
-    SetToken(token.access_token);
+    var identityUser = await _userManager.GetUserAsync(principal);
+    _logger.LogInformation("IdentityUser resolved: {Id}", identityUser?.Id ?? "(null)");
 
+    if (identityUser is null)
+        return false;
+
+    var jwt = await _userManager.GetAuthenticationTokenAsync(identityUser, FastApiLoginProvider, FastApiTokenName);
+
+    _logger.LogInformation("TokenStore read: {HasJwt} len={Len}",
+        !string.IsNullOrWhiteSpace(jwt),
+        jwt?.Length ?? 0);
+
+    if (string.IsNullOrWhiteSpace(jwt))
+        return false;
+
+    SetBearer(jwt);
     return true;
 }
 
 
-public void SetToken(string token)
-{
-    _token = token;
-    _http.DefaultRequestHeaders.Authorization =
-        new AuthenticationHeaderValue("Bearer", token);
-}
-
-    // =================== TOPICS ===================
+    // ===== TOPICS (публичные) =====
     public async Task<IReadOnlyList<TopicResponseDto>> GetTopicsAsync(CancellationToken ct = default)
     {
-        await EnsureServiceLoginAsync(ct);
         var topics = await _http.GetFromJsonAsync<List<TopicResponseDto>>("/topics", ct);
         return topics ?? new List<TopicResponseDto>();
     }
 
     public async Task<TopicResponseDto?> GetTopicAsync(int topicId, CancellationToken ct = default)
+        => await _http.GetFromJsonAsync<TopicResponseDto>($"/topics/{topicId}", ct);
+
+    // ===== TESTS =====
+    public async Task<TestSessionResponseDto?> StartTestAsync(int topicId, ClaimsPrincipal user, CancellationToken ct = default)
     {
-        await EnsureServiceLoginAsync(ct);
-        return await _http.GetFromJsonAsync<TopicResponseDto>($"/topics/{topicId}", ct);
+        if (!await TryUseUserJwtAsync(user, ct))
+            throw NoJwt();
+
+        var resp = await _http.PostAsync($"/topics/{topicId}/start-test", content: null, ct);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            _logger.LogWarning("StartTest failed: {Status}. Body: {Body}", resp.StatusCode, body);
+            return null;
+        }
+
+        return await resp.Content.ReadFromJsonAsync<TestSessionResponseDto>(cancellationToken: ct);
     }
 
-// =================== TESTS ===================
-public async Task<TestSessionResponseDto?> StartTestAsync(int topicId, CancellationToken ct = default)
-{
-    // Просто вызываем POST без авторизации
-    var resp = await _http.PostAsync($"/topics/{topicId}/start-test", content: null, ct);
-
-    if (!resp.IsSuccessStatusCode)
+    public async Task<IReadOnlyList<QuestionResponseDto>> GetTestQuestionsAsync(
+        int sessionId,
+        ClaimsPrincipal user,
+        CancellationToken ct = default)
     {
-        _logger.LogWarning("StartTest failed: {Status}", resp.StatusCode);
-        return null;
-    }
+        if (!await TryUseUserJwtAsync(user, ct))
+            throw NoJwt();
 
-    return await resp.Content.ReadFromJsonAsync<TestSessionResponseDto>(cancellationToken: ct);
-}
+        var resp = await _http.GetAsync($"/test/{sessionId}/questions", ct);
+        resp.EnsureSuccessStatusCode();
 
-
-
-    public async Task<IReadOnlyList<QuestionResponseDto>> GetTestQuestionsAsync(int sessionId, CancellationToken ct = default)
-    {
-        await EnsureServiceLoginAsync(ct);
-        var questions = await _http.GetFromJsonAsync<List<QuestionResponseDto>>($"/test/{sessionId}/questions", ct);
+        var questions = await resp.Content.ReadFromJsonAsync<List<QuestionResponseDto>>(cancellationToken: ct);
         return questions ?? new List<QuestionResponseDto>();
     }
 
-public async Task<TestResultResponseDto?> SubmitTestAsync(int sessionId, TestSubmitDto submit, CancellationToken ct = default)
-{
-    if (string.IsNullOrEmpty(_token))
-        return null;
+    public async Task<TestResultResponseDto?> SubmitTestAsync(
+        int sessionId,
+        TestSubmitDto submit,
+        ClaimsPrincipal user,
+        CancellationToken ct = default)
+    {
+        if (!await TryUseUserJwtAsync(user, ct))
+            throw NoJwt();
 
-    var resp = await _http.PostAsJsonAsync($"/test/{sessionId}/submit", submit, ct);
-    if (!resp.IsSuccessStatusCode)
-        return null;
+        var resp = await _http.PostAsJsonAsync($"/test/{sessionId}/submit", submit, ct);
+        if (!resp.IsSuccessStatusCode) return null;
 
-    return await resp.Content.ReadFromJsonAsync<TestResultResponseDto>(cancellationToken: ct);
-}
+        return await resp.Content.ReadFromJsonAsync<TestResultResponseDto>(cancellationToken: ct);
+    }
 
-
-    // =================== TEST HISTORY ===================
+    // ===== TEST HISTORY (защищён) =====
     public async Task<IReadOnlyList<TestSessionResponseDto>> GetTestHistoryAsync(
-        ClaimsPrincipal? user,
+        ClaimsPrincipal user,
         int skip = 0,
         int limit = 20,
         CancellationToken ct = default)
     {
-        if (user == null)
-            await EnsureServiceLoginAsync(ct);
+        if (!await TryUseUserJwtAsync(user, ct))
+            throw NoJwt();
 
         var url = $"/test/history?skip={skip}&limit={limit}";
-        var tests = await _http.GetFromJsonAsync<List<TestSessionResponseDto>>(url, ct);
+        var resp = await _http.GetAsync(url, ct);
+        resp.EnsureSuccessStatusCode();
+
+        var tests = await resp.Content.ReadFromJsonAsync<List<TestSessionResponseDto>>(cancellationToken: ct);
         return tests ?? new List<TestSessionResponseDto>();
     }
 
-    // =================== PROGRESS ===================
-    public async Task<IReadOnlyList<UserProgressResponseDto>> GetTopicProgressAsync(int topicId, ClaimsPrincipal? user = null, CancellationToken ct = default)
+    // ===== PROGRESS (защищён) =====
+    public async Task<IReadOnlyList<UserProgressResponseDto>> GetTopicProgressAsync(
+        int topicId,
+        ClaimsPrincipal user,
+        CancellationToken ct = default)
     {
-        if (user == null)
-            await EnsureServiceLoginAsync(ct);
+        if (!await TryUseUserJwtAsync(user, ct))
+            throw NoJwt();
 
-        var resp = await _http.GetFromJsonAsync<List<UserProgressResponseDto>>($"/topics/{topicId}/progress", ct);
-        return resp ?? new List<UserProgressResponseDto>();
+        var resp = await _http.GetAsync($"/topics/{topicId}/progress", ct);
+        resp.EnsureSuccessStatusCode();
+
+        var data = await resp.Content.ReadFromJsonAsync<List<UserProgressResponseDto>>(cancellationToken: ct);
+        return data ?? new List<UserProgressResponseDto>();
     }
 
-    public async Task<UserProgressResponseDto?> SendTopicMessageAsync(int topicId, string message, ClaimsPrincipal? user = null, CancellationToken ct = default)
+    public async Task<IReadOnlyList<UserProgressResponseDto>> SendTopicMessageAsync(
+        int topicId,
+        string message,
+        ClaimsPrincipal user,
+        CancellationToken ct = default)
     {
-        if (user == null)
-            await EnsureServiceLoginAsync(ct);
+        if (!await TryUseUserJwtAsync(user, ct))
+            throw NoJwt();
 
         var payload = new { message };
         var resp = await _http.PostAsJsonAsync($"/topics/{topicId}/progress", payload, ct);
+        resp.EnsureSuccessStatusCode();
 
-        if (!resp.IsSuccessStatusCode)
-            return null;
-
-        return await resp.Content.ReadFromJsonAsync<UserProgressResponseDto>(ct);
+        var data = await resp.Content.ReadFromJsonAsync<List<UserProgressResponseDto>>(cancellationToken: ct);
+        return data ?? new List<UserProgressResponseDto>();
     }
 
-    // =================== ADMIN TOPICS ===================
-    public async Task<TopicResponseDto?> CreateTopicAsync(TopicCreateDto topicCreateDto, CancellationToken ct = default)
+    // ===== ADMIN =====
+    public async Task<TopicResponseDto?> CreateTopicAsync(
+        TopicCreateDto topicCreateDto,
+        ClaimsPrincipal user,
+        CancellationToken ct = default)
     {
-        await EnsureServiceLoginAsync(ct);
+        if (!await TryUseUserJwtAsync(user, ct))
+            throw NoJwt();
 
         var response = await _http.PostAsJsonAsync("/admin/topics", topicCreateDto, ct);
-        if (!response.IsSuccessStatusCode)
-        {
-            _logger.LogWarning("Failed to create topic: {Status}", response.StatusCode);
-            return null;
-        }
+if (!response.IsSuccessStatusCode)
+{
+    var body = await response.Content.ReadAsStringAsync(ct);
+    _logger.LogWarning("CreateTopic failed: {Status}. Body: {Body}", response.StatusCode, body);
+    return null;
+}
 
-        return await response.Content.ReadFromJsonAsync<TopicResponseDto>(ct);
+        return await response.Content.ReadFromJsonAsync<TopicResponseDto>(cancellationToken: ct);
     }
 
-    // =================== CHAT ===================
-    public async Task<string> ChatAsync(string model, IReadOnlyList<ChatMessage> messages, CancellationToken ct = default)
+    // ===== CHAT (публичный) =====
+    public async Task<string> ChatAsync(
+        string model,
+        IReadOnlyList<ChatMessage> messages,
+        CancellationToken ct = default)
     {
-        await EnsureServiceLoginAsync(ct);
-
         var payload = new
         {
             model,
             stream = false,
             options = new Dictionary<string, object>(),
-            messages = messages.Select(m => new { role = m.Role.ToString().ToLowerInvariant(), content = m.Text }).ToList()
+            messages = messages.Select(m => new
+            {
+                role = m.Role.ToString().ToLowerInvariant(),
+                content = m.Text
+            }).ToList()
         };
 
-        var resp = await _http.PostAsJsonAsync("api/chat", payload, ct);
+        var resp = await _http.PostAsJsonAsync("/api/chat", payload, ct);
         resp.EnsureSuccessStatusCode();
 
         var json = await resp.Content.ReadFromJsonAsync<OllamaChatResponse>(cancellationToken: ct);
         return json?.message?.content ?? "";
     }
 
-    // =================== INTERNAL METHODS ===================
-    private async Task<bool> EnsureServiceLoginAsync(CancellationToken ct = default)
+    public async Task<bool> RegisterAsync(string username, string email, string password, CancellationToken ct = default)
     {
-        if (!string.IsNullOrEmpty(_token))
+        var payload = new { username, email, password };
+        var resp = await _http.PostAsJsonAsync("/register", payload, ct);
+        if (!resp.IsSuccessStatusCode)
         {
-            if (_http.DefaultRequestHeaders.Authorization == null)
-                _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
-
-            return true;
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            _logger.LogWarning("Backend register failed: {Status}. Body: {Body}", resp.StatusCode, body);
+            return false;
         }
-
-        _logger.LogInformation("Logging in to backend as service account {User}", ServiceUser);
-        var ok = await LoginAsync(ServiceUser, ServicePassword, ct);
-        if (!ok)
-            _logger.LogWarning("Backend login failed, please check credentials");
-
-        return ok;
+        return true;
     }
 
-    // =================== INTERNAL TYPES ===================
+    // ===== internal types for /api/chat response =====
     private sealed class OllamaChatResponse
     {
         public string? model { get; set; }

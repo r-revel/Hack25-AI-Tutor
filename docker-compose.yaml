@@ -55,14 +55,19 @@ services:
   backend:
     build:
       context: ./rest-api
-      dockerfile: Dockerfile  
+      dockerfile: Dockerfile
     container_name: airepetitor-backend
     ports:
       - "8000:8000"
     depends_on:
-      - ollama          
+      - ollama
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_CHAT_MODEL=gemma3:270m
+      - OLLAMA_EMBED_MODEL=nomic-embed-text
     volumes:
-      - ./Notebooks:/app/Notebooks      
+      - ./Notebooks:/app/Notebooks
+      - backend_sqlite:/app
 
   web:
     container_name: airepetitor-web
@@ -77,14 +82,20 @@ services:
       - MODEL_OLLAMA_CHAT=gemma3:270m
       - MODEL_OLLAMA_EMBEDDING=nomic-embed-text
       - BACKEND_URL=http://backend:8000
+      - SEED_USER_USERNAME=ruslan
+      - SEED_USER_EMAIL=ruslan@example.com
+      - SEED_USER_PASSWORD=1234
     depends_on:
       - sqlpreview
       - ollama
       - backend
     volumes:
       - data_protection:/root/.aspnet/DataProtection-Keys
+      - web_identity:/app
 
 volumes:
   db_data_mssql:
   ollama:
   data_protection:
+  backend_sqlite:
+  web_identity:       

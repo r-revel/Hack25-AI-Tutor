@@ -2,7 +2,9 @@
 @attribute [Authorize]
 @using AiRepetitor.Services
 @using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
 @inject BackendApi Backend
+@inject AuthenticationStateProvider AuthStateProvider
 
 <h3>Обучение по теме</h3>
 
@@ -28,22 +30,25 @@ else
 @code {
     [Parameter] public int TopicId { get; set; }
 
-    List<UserProgressResponseDto>? messages;
-    string input = "";
+    private List<UserProgressResponseDto>? messages;
+    private string input = "";
+    private ClaimsPrincipal? _user;
 
     protected override async Task OnInitializedAsync()
     {
-        messages = (await Backend.GetTopicProgressAsync(TopicId)).ToList();
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        _user = auth.User;
+
+        messages = (await Backend.GetTopicProgressAsync(TopicId, _user)).ToList();
     }
 
     private async Task Send()
     {
-        if (string.IsNullOrWhiteSpace(input))
+        if (string.IsNullOrWhiteSpace(input) || _user is null)
             return;
 
-        var reply = await Backend.SendTopicMessageAsync(TopicId, input);
-        if (reply != null)
-            messages!.Add(reply);
+        var list = await Backend.SendTopicMessageAsync(TopicId, input, _user);
+        messages = list.ToList();
 
         input = "";
     }
