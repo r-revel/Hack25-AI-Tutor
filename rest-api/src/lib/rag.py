@@ -70,7 +70,10 @@ def load_and_clean_documents(limit: int = 30):
     """Загрузка и очистка документов из ChromaDB"""
     CHROMA_DIR = os.environ.get('CHROMA_DIR', './db')
     client = chromadb.PersistentClient(path=CHROMA_DIR)
-    collection = client.get_collection('cloud_docs')
+    try:
+        collection = client.get_collection('cloud_docs')
+    except chromadb.errors.NotFoundError:
+        return None, None
 
     print("Loading documents from ChromaDB...")
     docs_res = collection.get(

@@ -19,6 +19,10 @@ COPY . .
 # Создание директорий для данных и логов
 RUN mkdir -p /app/logs /app/data
 
+ENV DATA_PATH=/data/cloud_ru_docs.jsonl
+ENV CHROMA_DIR=/var/lib/chroma_db
+ENV SQL_PATH=/var/lib/sqlite
+
 # Открытие порта
 EXPOSE 8030
 
