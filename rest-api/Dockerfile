@@ -20,7 +20,7 @@ COPY . .
 RUN mkdir -p /app/logs /app/data
 
 # Открытие порта
-EXPOSE 8000
+EXPOSE 8030
 
 # Команда запуска
 CMD ["python", "src/main.py"]

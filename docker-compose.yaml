@@ -17,17 +17,6 @@ services:
         limits:
           memory: 24g
 
-  adminer:
-    image: adminer
-    container_name: mssql-adminer
-    ports:
-      - 8030:8080
-    environment:
-      - ADMINER_DEFAULT_SERVER=sqlpreview
-      - ADMINER_DEFAULT_DB=master
-    depends_on:
-      - sqlpreview
-
   ollama:
     image: ollama/ollama
     container_name: ollama
@@ -58,7 +47,7 @@ services:
       dockerfile: Dockerfile
     container_name: airepetitor-backend
     ports:
-      - "8000:8000"
+      - "8030:8030"
     depends_on:
       - ollama
     environment:
@@ -81,7 +70,7 @@ services:
       - OLLAMA_URL=http://ollama:11434
       - MODEL_OLLAMA_CHAT=gemma3:270m
       - MODEL_OLLAMA_EMBEDDING=nomic-embed-text
-      - BACKEND_URL=http://backend:8000
+      - BACKEND_URL=http://backend:8030
       - SEED_USER_USERNAME=ruslan
       - SEED_USER_EMAIL=ruslan@example.com
       - SEED_USER_PASSWORD=1234
