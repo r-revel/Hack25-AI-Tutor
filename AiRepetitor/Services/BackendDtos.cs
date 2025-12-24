@@ -58,5 +58,6 @@ public sealed record UserProgressResponseDto(
     int user_id,
     int topic_id,
     string message,
+    bool is_user,
     DateTime created_at
 );

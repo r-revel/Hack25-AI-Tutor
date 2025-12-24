@@ -131,15 +131,26 @@
                 topicId: 1,
                 user: user
             );
-            
-                 // Преобразуем прогресс в сообщения чата
-            foreach (var progress in progressData)
-            {
-                messages.Add(new ChatMessage(
-                    ChatRole.Assistant,
-                    $"Прогресс: {progress.message} (Дата: {progress.created_at})"
-                ));
+            if (progressData != null && progressData.Any()) {
+                // Преобразуем прогресс в сообщения чата
+                foreach (var progress in progressData)
+                {
+                    messages.Add(new ChatMessage(
+                        progress.is_user ? ChatRole.User : ChatRole.Assistant,
+                        $"{progress.message} (Дата: {progress.created_at})"
+                    ));
+                }
+            } else {
+                currentResponseCancellation = new();
+
+                await BackendApi.SendTopicMessageAsync(
+                topicId: 1,
+                message: "Ты — эксперт-репетитор и ассистент, работающий строго в рамках предоставленной тебе базы знаний (контекста). Твоя задача — давать точные, полезные и структурированные ответы на вопросы пользователя. **Критически важные правила:** 1.  **Работай только на основе контекста:** Все твои ответы должны быть основаны на информации из загруженной базы знаний. Если данных для ответа нет, честно говори: \"В предоставленных материалах этой информации нет\". 2.  **Не раскрывай внутреннюю кухню:** Никогда не показывай пользователю свой внутренний процесс размышлений, шаги, инструкции или упоминания типа \"согласно контексту\", \"база знаний говорит\". Просто давай готовый, четкий ответ, как будто ты эксперт в предмете. 3.  **Будь структурированным и ясным:** Используй заголовки, списки и жирный шрифт для организации информации, но делай это естественно, в рамках ответа. 4.  **Отвечай сразу по делу:** Не пиши вводных фраз вроде \"На основе вашего запроса...\". Начинай ответ непосредственно с сути. **Твой стиль:** Дружелюбный, профессиональный, готовый объяснять сложные темы просто. Ты не программа, ты — виртуальный наставник.",
+                user: user,
+                ct: currentResponseCancellation.Token
+                );
             }
+            
             @* chatSuggestions?.Update(messages); *@
         
         // Сохраняем в LocalStorage
@@ -163,17 +174,14 @@
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
-        if (messageText is { Length: > 0 } text)
-        {
-            await BackendApi.SendTopicMessageAsync(
+    
+        await BackendApi.SendTopicMessageAsync(
             topicId: 1,
-            message: text,
+            message: userMessage.Text,
             user: user,
             ct: currentResponseCancellation.Token
-            );
-
-        }
-
+        );
+        await LoadTopicProgressAsync();
         @* var assistantText = await BackendApi.ChatAsync(
             model: "my-custom-model",
             messages: messages,
