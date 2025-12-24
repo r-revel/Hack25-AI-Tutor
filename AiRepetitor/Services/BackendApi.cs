@@ -203,8 +203,9 @@ public sealed class BackendApi
     {
         if (!await TryUseUserJwtAsync(user, ct))
             throw NoJwt();
-
-        var payload = new { message };
+        var userId = user.Identity; 
+        
+        var payload = new { message, is_user = true, topic_id = 0 };
         var resp = await _http.PostAsJsonAsync($"/topics/{topicId}/progress", payload, ct);
         resp.EnsureSuccessStatusCode();
 

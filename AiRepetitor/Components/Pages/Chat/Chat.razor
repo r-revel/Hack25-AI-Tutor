@@ -46,15 +46,7 @@
         <ChatMessageList Messages="@messages" InProgressMessage="@currentResponseMessage">
             <NoMessagesContent>
                 <div>
-                    To get started, try asking about these example documents:
                     <div class="example-docs mt-2 flex flex-col gap-1">
-                        @foreach (var doc in exampleDocuments.Distinct())
-                        {
-                            <button class="example-doc-btn text-blue-600 hover:underline"
-                                    @onclick="() => OpenDocument(doc)">
-                                @doc
-                            </button>
-                        }
                     </div>
                 </div>
             </NoMessagesContent>
@@ -101,6 +93,8 @@
     private ChatMessage? currentResponseMessage;
     private ChatInput? chatInput;
     private ChatSuggestions? chatSuggestions;
+    private bool isFirstLoad = true;
+    @inject AuthenticationStateProvider AuthStateProvider
 
     protected override async Task OnInitializedAsync()
     {
@@ -116,8 +110,44 @@
         }
 
         chatOptions.Tools = new[] { AIFunctionFactory.Create(SearchAsync) };
-    }
 
+
+        if (isFirstLoad)
+        {
+            await LoadTopicProgressAsync();
+            isFirstLoad = false;
+        }
+    }
+    private async Task LoadTopicProgressAsync()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            
+            var progressData = await BackendApi.GetTopicProgressAsync(
+                topicId: 1,
+                user: user
+            );
+            
+                 // Преобразуем прогресс в сообщения чата
+            foreach (var progress in progressData)
+            {
+                messages.Add(new ChatMessage(
+                    ChatRole.System, 
+                    $"Прогресс: {progress.message} (Дата: {progress.created_at})"
+                ));
+            }
+            chatSuggestions?.Update(messages);
+        
+        // Сохраняем в LocalStorage
+        }
+        catch (Exception ex)
+        {
+            // Обработка ошибки
+            Console.WriteLine($"Error loading topic progress: {ex.Message}");
+        }
+    }
     private async Task AddUserMessageAsync(ChatMessage userMessage)
     {
         CancelAnyCurrentResponse();

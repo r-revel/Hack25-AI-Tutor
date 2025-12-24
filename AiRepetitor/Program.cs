@@ -19,6 +19,8 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     .AddHubOptions(options => { options.EnableDetailedErrors = true; });
 
+Env.Load();
+
 var DataKey = Environment.GetEnvironmentVariable("DIR_KAY");
 
 if (string.IsNullOrEmpty(DataKey))
