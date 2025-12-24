@@ -96,6 +96,8 @@
     private bool isFirstLoad = true;
     @inject AuthenticationStateProvider AuthStateProvider
 
+    
+
     protected override async Task OnInitializedAsync()
     {
         // Попробуем загрузить сохраненные сообщения
@@ -134,11 +136,11 @@
             foreach (var progress in progressData)
             {
                 messages.Add(new ChatMessage(
-                    ChatRole.System, 
+                    ChatRole.Assistant,
                     $"Прогресс: {progress.message} (Дата: {progress.created_at})"
                 ));
             }
-            chatSuggestions?.Update(messages);
+            @* chatSuggestions?.Update(messages); *@
         
         // Сохраняем в LocalStorage
         }
@@ -158,16 +160,30 @@
 
         currentResponseCancellation = new();
 
-        var assistantText = await BackendApi.ChatAsync(
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (messageText is { Length: > 0 } text)
+        {
+            await BackendApi.SendTopicMessageAsync(
+            topicId: 1,
+            message: text,
+            user: user,
+            ct: currentResponseCancellation.Token
+            );
+
+        }
+
+        @* var assistantText = await BackendApi.ChatAsync(
             model: "my-custom-model",
             messages: messages,
-            ct: currentResponseCancellation.Token);
+            ct: currentResponseCancellation.Token); *@
 
-        messages.Add(new(ChatRole.Assistant, assistantText));
-        chatSuggestions?.Update(messages);
+        @* messages.Add(new(ChatRole.Assistant, assistantText)); *@
+        @* chatSuggestions?.Update(messages); *@
 
         // Сохранить обновленные сообщения в LocalStorage
-        await LocalStorage.SetItemAsync("chatMessages", messages);
+        @* await LocalStorage.SetItemAsync("chatMessages", messages); *@
     }
 
     private void CancelAnyCurrentResponse()

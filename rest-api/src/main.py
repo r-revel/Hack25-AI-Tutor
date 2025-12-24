@@ -49,8 +49,10 @@ def startup_event():
     db = SessionLocal()
     try:
         # seed topics
-        os.getenv("DATA_PATH") or "/app/Notebooks/cloud_ru_docs.jsonl",
-
+        seed_topics_from_jsonl(
+            db,
+            os.getenv("DATA_PATH") or "/app/Notebooks/cloud_ru_docs.jsonl",
+        )
         # seed user
         username = os.getenv("SEED_USER_USERNAME", "ruslan")
         email = os.getenv("SEED_USER_EMAIL", "ruslan@example.com")
