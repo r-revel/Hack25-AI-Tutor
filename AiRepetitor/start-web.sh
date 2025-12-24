@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Ждем backend
-until curl -f http://backend:8000/health; do
+until curl -f http://backend:8030/health; do
   echo "Waiting for backend..."
   sleep 5
 done
