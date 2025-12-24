@@ -56,10 +56,10 @@ services:
       - OLLAMA_EMBED_MODEL=nomic-embed-text
       - DATA_PATH=/data/cloud_ru_docs.jsonl
       - CHROMA_DIR=/var/lib/chroma_db
-      - SQL_PATH=/var/lib/sqlite
+      - SQL_PATH=/var/lib/sqlite/ai_tutor.sql
     volumes:
       - ./Notebooks/cloud_ru_docs.jsonl:/data/cloud_ru_docs.jsonl
-      - backend_sqlite:/var/lib/sqlite 
+      - backend_sqlite:/var/lib/sqlite
       - backend_chroma_db:/var/lib/chroma_db
 
   web:
